@@ -1,0 +1,11 @@
+[package]
+name = "jiroscope"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+emacs = "0.18.0"
+jiroscope-core = { path = "../jiroscope-core" }

@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "jiroscope-core",
+    "jiroscope",
+    "jiroscope-cli",
+    "jiroscope-test-server",
+]
+
+exclude = [
+]
+
