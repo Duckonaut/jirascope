@@ -14,6 +14,24 @@ fn init(_: &Env) -> Result<()> {
     Ok(())
 }
 
+#[defun]
+fn benchmark(env: &Env) -> Result<Value<'_>> {
+    let time = std::time::Instant::now();
+
+    for _ in 0..100 {
+        JIROSCOPE.get_notes()?;
+    }
+    println!("Rust ureq time: {:?}", time.elapsed());
+
+    let args = vec!["http://localhost:1937/notes".to_string().into_lisp(env)?];
+
+    let time = std::time::Instant::now();
+    env.call("benchmark-request-el-jiroscope", &args)?;
+    println!("Emacs time: {:?}", time.elapsed());
+
+    ().into_lisp(env)
+}
+
 // Define a function callable by Lisp code.
 #[defun]
 fn create_note(env: &Env, message: String) -> Result<Value<'_>> {
