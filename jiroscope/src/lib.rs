@@ -1,12 +1,14 @@
 #![allow(non_snake_case)] // Stops RA from complaining about the Emacs macros.
 
-use emacs::{defun, Env, Result, Value, IntoLisp};
-use jiroscope_core::Jiroscope;
+use std::sync::{Mutex, MutexGuard};
+
+use emacs::{defun, Env, IntoLisp, Result, Value};
+use jiroscope_core::{Auth, Config, Jiroscope, jira::{Issue, Issues}};
 
 // Emacs won't load the module without this.
 emacs::plugin_is_GPL_compatible!();
 
-static JIROSCOPE: Jiroscope = Jiroscope::new();
+static mut JIROSCOPE: Option<Mutex<Jiroscope>> = None;
 
 // Register the initialization hook that Emacs will call when it loads the module.
 #[emacs::module]
@@ -15,11 +17,30 @@ fn init(_: &Env) -> Result<()> {
 }
 
 #[defun]
+fn setup(url: String, login: String, api_token: String) -> Result<()> {
+    let config = Config::new(url);
+    let auth = Auth::new(login, api_token);
+
+    let mut jiroscope = Jiroscope::new(config, auth);
+    jiroscope.init()?;
+
+    unsafe {
+        JIROSCOPE = Some(Mutex::new(jiroscope));
+    }
+
+    Ok(())
+}
+
+fn get_jiroscope<'a>() -> MutexGuard<'a, Jiroscope> {
+    unsafe { JIROSCOPE.as_ref().unwrap() }.lock().unwrap()
+}
+
+#[defun]
 fn benchmark(env: &Env) -> Result<Value<'_>> {
     let time = std::time::Instant::now();
 
     for _ in 0..100 {
-        JIROSCOPE.get_notes()?;
+        get_jiroscope().get_notes()?;
     }
     println!("Rust ureq time: {:?}", time.elapsed());
 
@@ -35,7 +56,7 @@ fn benchmark(env: &Env) -> Result<Value<'_>> {
 // Define a function callable by Lisp code.
 #[defun]
 fn create_note(env: &Env, message: String) -> Result<Value<'_>> {
-    let note = JIROSCOPE.register_note(message)?;
+    let note = get_jiroscope().register_note(message)?;
 
     let id = note.id.unwrap();
 
@@ -44,7 +65,7 @@ fn create_note(env: &Env, message: String) -> Result<Value<'_>> {
 
 #[defun]
 fn get_notes(env: &Env) -> Result<Value<'_>> {
-    let notes = JIROSCOPE.get_notes()?;
+    let notes = get_jiroscope().get_notes()?;
 
     let v = env.make_vector(notes.len(), ())?;
 
@@ -57,14 +78,33 @@ fn get_notes(env: &Env) -> Result<Value<'_>> {
 
 #[defun]
 fn get_note_by_id(env: &Env, id: usize) -> Result<Value<'_>> {
-    let note = JIROSCOPE.get_note_by_id(id)?;
+    let note = get_jiroscope().get_note_by_id(id)?;
 
     note.message.into_lisp(env)
 }
 
 #[defun]
 fn update_note_by_id(env: &Env, id: usize, message: String) -> Result<Value<'_>> {
-    let note = JIROSCOPE.update_note_by_id(id, message)?;
+    let note = get_jiroscope().update_note_by_id(id, message)?;
 
     note.message.into_lisp(env)
+}
+
+#[defun(user_ptr)]
+fn get_issue(_: &Env, issue_key: String) -> Result<Issue> {
+    let issue = get_jiroscope().get_issue(&*issue_key)?;
+
+    Ok(issue)
+}
+
+#[defun(user_ptr)]
+fn get_all_issues(_: &Env) -> Result<Issues> {
+    let issues = get_jiroscope().get_all_issues()?;
+
+    Ok(issues)
+}
+
+#[defun]
+fn get_issue_key<'e>(env: &'e Env, issue: &mut Issue) -> Result<Value<'e>> {
+    issue.key.clone().into_lisp(env)
 }
