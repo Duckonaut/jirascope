@@ -1,3 +1,4 @@
+use jira::Issues;
 use serde::{Deserialize, Serialize};
 use ureq::post;
 
@@ -83,6 +84,14 @@ impl Jiroscope {
         let issue = response.into_json()?;
 
         Ok(issue)
+    }
+
+    pub fn get_all_issues(&mut self) -> Result<Issues, crate::Error> {
+        let response = self.api_get("search")?;
+
+        let issues: Issues = response.into_json()?;
+
+        Ok(issues)
     }
 
     fn api_get(&mut self, path: &str) -> Result<ureq::Response, crate::Error> {

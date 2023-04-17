@@ -13,6 +13,7 @@ struct Args {
 #[derive(Debug, Clone, Parser)]
 enum Subcommand {
     Get { board_id: String, issue_id: String },
+    All,
 }
 
 fn main() {
@@ -31,5 +32,9 @@ fn main() {
             let issue = jiroscope.get_issue(format!("{}-{}", board_id, issue_id).as_str()).unwrap();
             println!("{:#?}", issue);
         },
+        Subcommand::All => {
+            let issues = jiroscope.get_all_issues().unwrap();
+            println!("{:#?}", issues);
+        }
     }
 }

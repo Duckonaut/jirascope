@@ -1,38 +1,46 @@
 use serde::{Deserialize, Serialize};
 
+use super::Project;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Issues {
+    pub issues: Vec<Issue>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Issue {
-    id: String,
-    key: String,
-    fields: IssueFields,
+    pub id: String,
+    pub key: String,
+    pub fields: IssueFields,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct IssueFields {
-    summary: String,
-    description: Option<String>,
-    priority: Priority,
-    status: Status,
-    assignee: Option<User>,
-    reporter: User,
-    created: String, // ISO 8601 date/time string
-    updated: String, // ISO 8601 date/time string
+pub struct IssueFields {
+    pub summary: String,
+    pub description: Option<String>,
+    pub priority: Priority,
+    pub status: Status,
+    pub assignee: Option<User>,
+    pub reporter: User,
+    pub created: String, // ISO 8601 date/time string
+    pub updated: String, // ISO 8601 date/time string
+    pub project: Project,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct Priority {
-    name: String,
+pub struct Priority {
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct Status {
-    name: String,
+pub struct Status {
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct User {
+pub struct User {
     #[serde(rename = "emailAddress")]
-    email_address: String,
+    pub email_address: String,
     #[serde(rename = "displayName")]
-    display_name: String
+    pub display_name: String
 }
