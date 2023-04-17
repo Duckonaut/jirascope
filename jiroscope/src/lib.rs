@@ -108,3 +108,8 @@ fn get_all_issues(_: &Env) -> Result<Issues> {
 fn get_issue_key<'e>(env: &'e Env, issue: &mut Issue) -> Result<Value<'e>> {
     issue.key.clone().into_lisp(env)
 }
+
+#[defun]
+fn get_issue_summary<'e>(env: &'e Env, issue: &mut Issue) -> Result<Value<'e>> {
+    issue.fields.summary.clone().into_lisp(env)
+}
