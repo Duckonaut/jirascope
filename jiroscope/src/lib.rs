@@ -167,7 +167,9 @@ fn open_jiroscope_buffer(env: &Env) -> Result<Value<'_>> {
 
     let args = vec![buffer];
 
-    env.call("switch-to-buffer-other-window", &args)?;
+    env.call("switch-to-buffer", &args)?;
+
+    env.call("erase-buffer", [])?;
 
     ().into_lisp(env)
 }
