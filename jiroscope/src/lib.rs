@@ -3,7 +3,10 @@
 use std::sync::{Mutex, MutexGuard};
 
 use emacs::{defun, Env, IntoLisp, Result, Value};
-use jiroscope_core::{Auth, Config, Jiroscope, jira::{Issue, Issues}};
+use jiroscope_core::{
+    jira::{Issue, Issues},
+    Auth, Config, Jiroscope,
+};
 
 // Emacs won't load the module without this.
 emacs::plugin_is_GPL_compatible!();
@@ -112,4 +115,59 @@ fn get_issue_key<'e>(env: &'e Env, issue: &mut Issue) -> Result<Value<'e>> {
 #[defun]
 fn get_issue_summary<'e>(env: &'e Env, issue: &mut Issue) -> Result<Value<'e>> {
     issue.fields.summary.clone().into_lisp(env)
+}
+
+#[defun]
+fn display_issue(env: &Env, issue_key: String) -> Result<Value<'_>> {
+    let issue = get_jiroscope().get_issue(&*issue_key)?;
+    open_jiroscope_buffer(env)?;
+
+    let args = vec![format!("* {} *", issue_key).into_lisp(env)?];
+
+    env.call("insert", &args)?;
+
+    let args = vec![];
+
+    env.call("newline", &args)?;
+
+    let args = vec![format!("Summary: {}", issue.fields.summary).into_lisp(env)?];
+
+    env.call("insert", &args)?;
+
+    let args = vec![];
+
+    env.call("newline", &args)?;
+
+    if let Some(description) = issue.fields.description {
+        let args = vec![format!("Description: {}", description).into_lisp(env)?];
+
+        env.call("insert", &args)?;
+
+        let args = vec![];
+
+        env.call("newline", &args)?;
+    }
+
+    let args = vec![format!("Status: {}", issue.fields.status.name).into_lisp(env)?];
+
+    env.call("insert", &args)?;
+
+    let args = vec![];
+
+    env.call("newline", &args)?;
+
+    ().into_lisp(env)
+}
+
+#[defun]
+fn open_jiroscope_buffer(env: &Env) -> Result<Value<'_>> {
+    let args = vec!["*jiroscope*".to_string().into_lisp(env)?];
+
+    let buffer = env.call("get-buffer-create", &args)?;
+
+    let args = vec![buffer];
+
+    env.call("switch-to-buffer-other-window", &args)?;
+
+    ().into_lisp(env)
 }
