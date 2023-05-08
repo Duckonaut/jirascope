@@ -13,11 +13,9 @@ pub use error::Error;
 
 use crate::jira::Issue;
 
-// Empty struct for now. Will almost certainly be expanded later to hold state like tokens and
-// cached data.
 pub struct Jiroscope {
     config: Config,
-    auth: Auth,
+    pub auth: Auth,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,9 +38,7 @@ impl Jiroscope {
     pub fn register_note(&self, message: String) -> Result<Note, crate::Error> {
         let note = Note { id: None, message };
 
-        let time = std::time::Instant::now();
         let response = post("http://localhost:1937/notes").send_json(note)?;
-        println!("Time to register note: {:?}", time.elapsed());
 
         let note: Note = response.into_json()?;
 
