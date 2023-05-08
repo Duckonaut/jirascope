@@ -72,19 +72,19 @@ Emacs functions used for testing:
 ; 1 elisp request + JSON conversion
 (defun jiroscope-benchmark-request-el (url)
     (request-response-data
-     (request url
-       :parser 'json-read
-       :sync t)))
+        (request url
+            :parser 'json-read
+            :sync t)))
 
 ; 100 requests in elisp from elisp
 (defun jiroscope-benchmark-request-el-full (url)
-  (dotimes (i 100)
-    (jiroscope-benchmark-request-el url)))
+    (dotimes (i 100)
+        (jiroscope-benchmark-request-el url)))
 
 ; 100 requests in rust from elisp
 (defun jiroscope-benchmark-ureq-full (url)
-  (dotimes (i 100)
-    (jiroscope-get-notes)))
+    (dotimes (i 100)
+        (jiroscope-get-notes)))
 ```
 
 ## GET test server notes
@@ -107,33 +107,33 @@ Emacs functions used for testing:
 ; 1 elisp request + JSON conversion
 (defun jiroscope-auth-benchmark-request-el (url auth_hash)
     (request-response-data
-     (request url
-       :headers '(("Authorization" . ((concat "Basic " auth_hash))))
-       :parser 'json-read
-       :sync t)))
+        (request url
+            :parser 'json-read
+            :headers `(("Authorization" . ,(concat "Basic " auth_hash)) ("Content-Type" . "application/json"))
+            :sync t)))
 
 ; 100 requests in elisp from elisp
 (defun jiroscope-auth-benchmark-request-el-full (url auth_hash)
-  (dotimes (i 100)
-    (jiroscope-auth-benchmark-request-el url auth_hash)))
+    (dotimes (i 100)
+        (jiroscope-auth-benchmark-request-el url auth_hash)))
 
 ; 100 requests in rust from elisp
 (defun jiroscope-auth-benchmark-ureq-full ()
-  (dotimes (i 100)
-    (jiroscope-get-all-issues)))
+    (dotimes (i 100)
+        (jiroscope-get-all-issues)))
 ```
 
 ## GET Jira Cloud issues
 
 | Caller | Backend | Time |
 | --- | --- | --- |
-| Rust | ureq | 37.475099131s |
-| Rust | request.el | 42.424662652s |
-| ELisp | request.el | 42.651552689s |
-| ELisp | ureq | 38.107238839s |
+| Rust | ureq | 37.691015982s |
+| Rust | request.el | 44.134384044s |
+| ELisp | request.el | 43.612512787s |
+| ELisp | ureq | 37.633412218s |
 
 In a real-world scenario, calling a remote server, the differences are smaller. A difference of
-4-5 seconds between `ureq` and `request.el` is not a big deal, but it still leaves `ureq` as the
+6-7 seconds between `ureq` and `request.el` is not a big deal, but it still leaves `ureq` as the
 strictly faster option.
 
 # Thoughts
