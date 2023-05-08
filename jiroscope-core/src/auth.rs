@@ -4,9 +4,9 @@ use ureq::Request;
 use crate::Config;
 
 pub struct Auth {
-    pub username: String,
-    pub api_token: String,
-    pub cached_basic_auth: Option<String>,
+    username: String,
+    api_token: String,
+    cached_basic_auth: Option<String>,
 }
 
 impl Auth {
@@ -32,7 +32,7 @@ impl Auth {
         }
     }
 
-    fn get_basic_auth(&mut self) -> String {
+    pub fn get_basic_auth(&mut self) -> String {
         self.ensure_cached_basic_auth();
 
         self.cached_basic_auth.as_ref().unwrap().clone()

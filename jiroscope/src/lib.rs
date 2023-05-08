@@ -1,5 +1,6 @@
 #![allow(non_snake_case)] // Stops RA from complaining about the Emacs macros.
 
+use std::io::Write;
 use std::sync::{Mutex, MutexGuard};
 
 use emacs::{defun, Env, IntoLisp, Result, Value};
@@ -39,19 +40,102 @@ fn get_jiroscope<'a>() -> MutexGuard<'a, Jiroscope> {
 }
 
 #[defun]
-fn benchmark(env: &Env) -> Result<Value<'_>> {
-    let time = std::time::Instant::now();
+fn benchmark_notes(env: &Env) -> Result<Value<'_>> {
+    let mut file = std::fs::File::create("jiroscope-benchmark.md")?;
 
+    writeln!(file, "| Caller | Backend | Time |")?;
+    writeln!(file, "| --- | --- | --- |")?;
+    write!(file, "| Rust | ureq | ")?;
+
+    let time = std::time::Instant::now();
     for _ in 0..100 {
         get_jiroscope().get_notes()?;
     }
-    println!("Rust ureq time: {:?}", time.elapsed());
+    let elapsed = time.elapsed();
+    write!(file, "{:?}", elapsed)?;
+
+    writeln!(file, " |")?;
+    write!(file, "| Rust | request.el | ")?;
 
     let args = vec!["http://localhost:1937/notes".to_string().into_lisp(env)?];
 
     let time = std::time::Instant::now();
-    env.call("benchmark-request-el-jiroscope", &args)?;
-    println!("Emacs time: {:?}", time.elapsed());
+    for _ in 0..100 {
+        env.call("jiroscope-benchmark-request-el", &args)?;
+    }
+    let elapsed = time.elapsed();
+    write!(file, "{:?}", elapsed)?;
+
+    writeln!(file, " |")?;
+    write!(file, "| ELisp | request.el | ")?;
+
+    let time = std::time::Instant::now();
+    env.call("jiroscope-benchmark-request-el-full", &args)?;
+    let elapsed = time.elapsed();
+    write!(file, "{:?}", elapsed)?;
+
+    writeln!(file, " |")?;
+    write!(file, "| ELisp | ureq | ")?;
+
+    let time = std::time::Instant::now();
+    env.call("jiroscope-benchmark-ureq-full", &args)?;
+    let elapsed = time.elapsed();
+    write!(file, "{:?}", elapsed)?;
+
+    writeln!(file, " |")?;
+
+    ().into_lisp(env)
+}
+
+#[defun]
+fn benchmark_issues(env: &Env) -> Result<Value<'_>> {
+    let mut file = std::fs::File::create("jiroscope-benchmark.md")?;
+
+    writeln!(file, "| Caller | Backend | Time |")?;
+    writeln!(file, "| --- | --- | --- |")?;
+    write!(file, "| Rust | ureq | ")?;
+
+    let time = std::time::Instant::now();
+    for _ in 0..100 {
+        get_jiroscope().get_all_issues()?;
+    }
+    let elapsed = time.elapsed();
+    write!(file, "{:?}", elapsed)?;
+
+    writeln!(file, " |")?;
+    write!(file, "| Rust | request.el | ")?;
+
+    let args = vec![
+        "https://jiroscope-testing.atlassian.net/rest/api/3/search"
+            .to_string()
+            .into_lisp(env)?,
+        get_jiroscope().auth.get_basic_auth().into_lisp(env)?,
+    ];
+
+    let time = std::time::Instant::now();
+    for _ in 0..100 {
+        env.call("jiroscope-auth-benchmark-request-el", &args)?;
+    }
+    let elapsed = time.elapsed();
+    write!(file, "{:?}", elapsed)?;
+
+    writeln!(file, " |")?;
+    write!(file, "| ELisp | request.el | ")?;
+
+    let time = std::time::Instant::now();
+    env.call("jiroscope-auth-benchmark-request-el-full", &args)?;
+    let elapsed = time.elapsed();
+    write!(file, "{:?}", elapsed)?;
+
+    writeln!(file, " |")?;
+    write!(file, "| ELisp | ureq | ")?;
+
+    let time = std::time::Instant::now();
+    env.call("jiroscope-auth-benchmark-ureq-full", [])?;
+    let elapsed = time.elapsed();
+    write!(file, "{:?}", elapsed)?;
+
+    writeln!(file, " |")?;
 
     ().into_lisp(env)
 }
