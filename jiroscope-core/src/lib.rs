@@ -1,4 +1,4 @@
-use jira::Issues;
+use jira::{IssueCreationMeta, IssueEvent, Issues, IssueEditMeta};
 use serde::{Deserialize, Serialize};
 use ureq::post;
 
@@ -35,6 +35,7 @@ impl Jiroscope {
         Ok(())
     }
 
+    #[cfg(test_server)]
     pub fn register_note(&self, message: String) -> Result<Note, crate::Error> {
         let note = Note { id: None, message };
 
@@ -45,6 +46,7 @@ impl Jiroscope {
         Ok(note)
     }
 
+    #[cfg(test_server)]
     pub fn get_notes(&self) -> Result<Vec<Note>, crate::Error> {
         let response = ureq::get("http://localhost:1937/notes").call()?;
 
@@ -53,6 +55,7 @@ impl Jiroscope {
         Ok(notes)
     }
 
+    #[cfg(test_server)]
     pub fn get_note_by_id(&self, id: usize) -> Result<Note, crate::Error> {
         let response = ureq::get(&format!("http://localhost:1937/notes/{}", id)).call()?;
 
@@ -61,6 +64,7 @@ impl Jiroscope {
         Ok(note)
     }
 
+    #[cfg(test_server)]
     pub fn update_note_by_id(&self, id: usize, message: String) -> Result<Note, crate::Error> {
         let note = Note {
             id: Some(id),
@@ -88,6 +92,33 @@ impl Jiroscope {
         let issues: Issues = response.into_json()?;
 
         Ok(issues)
+    }
+
+    pub fn get_issue_events(&mut self) -> Result<Vec<IssueEvent>, crate::Error> {
+        let response = self.api_get("events")?;
+
+        let issue_events: Vec<IssueEvent> = response.into_json()?;
+
+        Ok(issue_events)
+    }
+
+    pub fn get_issue_creation_meta(&mut self) -> Result<IssueCreationMeta, crate::Error> {
+        let response = self.api_get("issue/createmeta")?;
+
+        let issue_events: IssueCreationMeta = response.into_json()?;
+
+        Ok(issue_events)
+    }
+
+    pub fn get_issue_edit_meta<'a>(
+        &mut self,
+        issue_id: impl Into<&'a str>,
+    ) -> Result<IssueEditMeta, crate::Error> {
+        let response = self.api_get(format!("issue/{}/editmeta", issue_id.into()).as_str())?;
+
+        let issue_events: IssueEditMeta = response.into_json()?;
+
+        Ok(issue_events)
     }
 
     fn api_get(&mut self, path: &str) -> Result<ureq::Response, crate::Error> {

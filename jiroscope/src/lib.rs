@@ -1,6 +1,5 @@
 #![allow(non_snake_case)] // Stops RA from complaining about the Emacs macros.
 
-use std::io::Write;
 use std::sync::{Mutex, MutexGuard};
 
 use emacs::{defun, Env, IntoLisp, Result, Value};
@@ -8,11 +7,16 @@ use jiroscope_core::{
     jira::{Issue, Issues},
     Auth, Config, Jiroscope,
 };
+use utils::{write_tuples_to_md_table, write_tuples_to_pyplot_data};
+
+mod benchmark;
+mod utils;
 
 // Emacs won't load the module without this.
 emacs::plugin_is_GPL_compatible!();
 
 static mut JIROSCOPE: Option<Mutex<Jiroscope>> = None;
+static JIROSCOPE_BUFFER_NAME: &str = "*jiroscope*";
 
 // Register the initialization hook that Emacs will call when it loads the module.
 #[emacs::module]
@@ -39,23 +43,20 @@ fn get_jiroscope<'a>() -> MutexGuard<'a, Jiroscope> {
     unsafe { JIROSCOPE.as_ref().unwrap() }.lock().unwrap()
 }
 
+#[cfg(test_server)]
 #[defun]
 fn benchmark_notes(env: &Env) -> Result<Value<'_>> {
-    let mut file = std::fs::File::create("jiroscope-benchmark.md")?;
-
-    writeln!(file, "| Caller | Backend | Time |")?;
-    writeln!(file, "| --- | --- | --- |")?;
-    write!(file, "| Rust | ureq | ")?;
+    let mut rows_verbose = vec![];
+    let mut rows_micro = vec![];
 
     let time = std::time::Instant::now();
     for _ in 0..100 {
         get_jiroscope().get_notes()?;
     }
     let elapsed = time.elapsed();
-    write!(file, "{:?}", elapsed)?;
-
-    writeln!(file, " |")?;
-    write!(file, "| Rust | request.el | ")?;
+    rows_verbose.push(("Rust", "ureq", format!("{:?}", elapsed)));
+    rows_micro.push(("Rust, ureq", elapsed.as_micros()));
+    
 
     let args = vec!["http://localhost:1937/notes".to_string().into_lisp(env)?];
 
@@ -64,46 +65,44 @@ fn benchmark_notes(env: &Env) -> Result<Value<'_>> {
         env.call("jiroscope-benchmark-request-el", &args)?;
     }
     let elapsed = time.elapsed();
-    write!(file, "{:?}", elapsed)?;
-
-    writeln!(file, " |")?;
-    write!(file, "| ELisp | request.el | ")?;
+    rows_verbose.push(("Rust", "request.el", format!("{:?}", elapsed)));
+    rows_micro.push(("Rust, request.el", elapsed.as_micros()));
 
     let time = std::time::Instant::now();
     env.call("jiroscope-benchmark-request-el-full", &args)?;
     let elapsed = time.elapsed();
-    write!(file, "{:?}", elapsed)?;
-
-    writeln!(file, " |")?;
-    write!(file, "| ELisp | ureq | ")?;
+    rows_verbose.push(("ELisp", "request.el", format!("{:?}", elapsed)));
+    rows_micro.push(("ELisp, request.el", elapsed.as_micros()));
 
     let time = std::time::Instant::now();
     env.call("jiroscope-benchmark-ureq-full", &args)?;
     let elapsed = time.elapsed();
-    write!(file, "{:?}", elapsed)?;
+    rows_verbose.push(("ELisp", "ureq", format!("{:?}", elapsed)));
+    rows_micro.push(("ELisp, ureq", elapsed.as_micros()));
 
-    writeln!(file, " |")?;
+    let mut file = std::fs::File::create("jiroscope-benchmark.md")?;
+
+    write_tuples_to_md_table(&mut file, &["Caller", "Backend", "Time"], &rows_verbose)?;
+
+    let mut file = std::fs::File::create("jiroscope-benchmark-micro-data.py")?;
+
+    write_tuples_to_pyplot_data(&mut file, &["Caller", "Time"], &rows_micro)?;
 
     ().into_lisp(env)
 }
 
 #[defun]
 fn benchmark_issues(env: &Env) -> Result<Value<'_>> {
-    let mut file = std::fs::File::create("jiroscope-benchmark.md")?;
-
-    writeln!(file, "| Caller | Backend | Time |")?;
-    writeln!(file, "| --- | --- | --- |")?;
-    write!(file, "| Rust | ureq | ")?;
+    let mut rows_verbose = vec![];
+    let mut rows_micro = vec![];
 
     let time = std::time::Instant::now();
     for _ in 0..100 {
         get_jiroscope().get_all_issues()?;
     }
     let elapsed = time.elapsed();
-    write!(file, "{:?}", elapsed)?;
-
-    writeln!(file, " |")?;
-    write!(file, "| Rust | request.el | ")?;
+    rows_verbose.push(("Rust", "ureq", format!("{:?}", elapsed)));
+    rows_micro.push(("Rust, ureq", elapsed.as_micros()));
 
     let args = vec![
         "https://jiroscope-testing.atlassian.net/rest/api/3/search"
@@ -117,30 +116,34 @@ fn benchmark_issues(env: &Env) -> Result<Value<'_>> {
         env.call("jiroscope-auth-benchmark-request-el", &args)?;
     }
     let elapsed = time.elapsed();
-    write!(file, "{:?}", elapsed)?;
-
-    writeln!(file, " |")?;
-    write!(file, "| ELisp | request.el | ")?;
+    rows_verbose.push(("Rust", "request.el", format!("{:?}", elapsed)));
+    rows_micro.push(("Rust, request.el", elapsed.as_micros()));
 
     let time = std::time::Instant::now();
     env.call("jiroscope-auth-benchmark-request-el-full", &args)?;
     let elapsed = time.elapsed();
-    write!(file, "{:?}", elapsed)?;
-
-    writeln!(file, " |")?;
-    write!(file, "| ELisp | ureq | ")?;
+    rows_verbose.push(("ELisp", "request.el", format!("{:?}", elapsed)));
+    rows_micro.push(("ELisp, request.el", elapsed.as_micros()));
 
     let time = std::time::Instant::now();
     env.call("jiroscope-auth-benchmark-ureq-full", [])?;
     let elapsed = time.elapsed();
-    write!(file, "{:?}", elapsed)?;
+    rows_verbose.push(("ELisp", "ureq", format!("{:?}", elapsed)));
+    rows_micro.push(("ELisp, ureq", elapsed.as_micros()));
 
-    writeln!(file, " |")?;
+    let mut file = std::fs::File::create("jiroscope-auth-benchmark.md")?;
+
+    write_tuples_to_md_table(&mut file, &["Caller", "Backend", "Time"], &rows_verbose)?;
+
+    let mut file = std::fs::File::create("jiroscope-auth-benchmark-micro-data.py")?;
+
+    write_tuples_to_pyplot_data(&mut file, &["Caller", "Time"], &rows_micro)?;
 
     ().into_lisp(env)
 }
 
 // Define a function callable by Lisp code.
+#[cfg(test_server)]
 #[defun]
 fn create_note(env: &Env, message: String) -> Result<Value<'_>> {
     let note = get_jiroscope().register_note(message)?;
@@ -150,6 +153,7 @@ fn create_note(env: &Env, message: String) -> Result<Value<'_>> {
     id.into_lisp(env)
 }
 
+#[cfg(test_server)]
 #[defun]
 fn get_notes(env: &Env) -> Result<Value<'_>> {
     let notes = get_jiroscope().get_notes()?;
@@ -163,6 +167,7 @@ fn get_notes(env: &Env) -> Result<Value<'_>> {
     v.into_lisp(env)
 }
 
+#[cfg(test_server)]
 #[defun]
 fn get_note_by_id(env: &Env, id: usize) -> Result<Value<'_>> {
     let note = get_jiroscope().get_note_by_id(id)?;
@@ -170,6 +175,7 @@ fn get_note_by_id(env: &Env, id: usize) -> Result<Value<'_>> {
     note.message.into_lisp(env)
 }
 
+#[cfg(test_server)]
 #[defun]
 fn update_note_by_id(env: &Env, id: usize, message: String) -> Result<Value<'_>> {
     let note = get_jiroscope().update_note_by_id(id, message)?;
@@ -245,7 +251,7 @@ fn display_issue(env: &Env, issue_key: String) -> Result<Value<'_>> {
 
 #[defun]
 fn open_jiroscope_buffer(env: &Env) -> Result<Value<'_>> {
-    let args = vec!["*jiroscope*".to_string().into_lisp(env)?];
+    let args = vec![JIROSCOPE_BUFFER_NAME.to_string().into_lisp(env)?];
 
     let buffer = env.call("get-buffer-create", &args)?;
 

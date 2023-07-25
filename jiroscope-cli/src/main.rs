@@ -12,8 +12,11 @@ struct Args {
 
 #[derive(Debug, Clone, Parser)]
 enum Subcommand {
-    Get { board_id: String, issue_id: String },
+    Issue { board_id: String, issue_id: String },
     All,
+    CreateMeta,
+    EditMeta { board_id: String, issue_id: String },
+    Events,
 }
 
 fn main() {
@@ -28,13 +31,29 @@ fn main() {
     jiroscope.init().unwrap();
 
     match subcommand {
-        Subcommand::Get { board_id, issue_id } => {
-            let issue = jiroscope.get_issue(format!("{}-{}", board_id, issue_id).as_str()).unwrap();
+        Subcommand::Issue { board_id, issue_id } => {
+            let issue = jiroscope
+                .get_issue(format!("{}-{}", board_id, issue_id).as_str())
+                .unwrap();
             println!("{:#?}", issue);
-        },
+        }
         Subcommand::All => {
             let issues = jiroscope.get_all_issues().unwrap();
             println!("{:#?}", issues);
+        }
+        Subcommand::CreateMeta => {
+            let meta = jiroscope.get_issue_creation_meta().unwrap();
+            println!("{:#?}", meta);
+        }
+        Subcommand::EditMeta { board_id, issue_id } => {
+            let meta = jiroscope
+                .get_issue_edit_meta(format!("{}-{}", board_id, issue_id).as_str())
+                .unwrap();
+            println!("{:#?}", meta);
+        }
+        Subcommand::Events => {
+            let events = jiroscope.get_issue_events().unwrap();
+            println!("{:#?}", events);
         }
     }
 }
