@@ -31,6 +31,33 @@ pub struct IssueFields {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueCreation {
+    pub fields: IssueCreationFields,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueCreationFields {
+    pub project: Project,
+    #[serde(rename = "issuetype")]
+    pub issue_type: IssueType,
+    pub summary: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<Priority>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<User>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatedIssue {
+    pub id: String,
+    pub key: String,
+    #[serde(rename = "self")]
+    pub self_link: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Priority {
     pub name: String,
 }

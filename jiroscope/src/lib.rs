@@ -4,12 +4,15 @@ use std::sync::{Mutex, MutexGuard};
 
 use emacs::{defun, Env, IntoLisp, Result, Value};
 use jiroscope_core::{
-    jira::{Issue, Issues},
+    jira::{Issue, IssueCreation, IssueCreationFields, Issues, Project},
     Auth, Config, Jiroscope,
 };
-use utils::{write_tuples_to_md_table, write_tuples_to_pyplot_data};
 
+#[cfg(feature = "benchmark")]
 mod benchmark;
+#[cfg(feature = "test_server")]
+mod test_server;
+#[allow(dead_code)]
 mod utils;
 
 // Emacs won't load the module without this.
@@ -43,146 +46,6 @@ fn get_jiroscope<'a>() -> MutexGuard<'a, Jiroscope> {
     unsafe { JIROSCOPE.as_ref().unwrap() }.lock().unwrap()
 }
 
-#[cfg(test_server)]
-#[defun]
-fn benchmark_notes(env: &Env) -> Result<Value<'_>> {
-    let mut rows_verbose = vec![];
-    let mut rows_micro = vec![];
-
-    let time = std::time::Instant::now();
-    for _ in 0..100 {
-        get_jiroscope().get_notes()?;
-    }
-    let elapsed = time.elapsed();
-    rows_verbose.push(("Rust", "ureq", format!("{:?}", elapsed)));
-    rows_micro.push(("Rust, ureq", elapsed.as_micros()));
-    
-
-    let args = vec!["http://localhost:1937/notes".to_string().into_lisp(env)?];
-
-    let time = std::time::Instant::now();
-    for _ in 0..100 {
-        env.call("jiroscope-benchmark-request-el", &args)?;
-    }
-    let elapsed = time.elapsed();
-    rows_verbose.push(("Rust", "request.el", format!("{:?}", elapsed)));
-    rows_micro.push(("Rust, request.el", elapsed.as_micros()));
-
-    let time = std::time::Instant::now();
-    env.call("jiroscope-benchmark-request-el-full", &args)?;
-    let elapsed = time.elapsed();
-    rows_verbose.push(("ELisp", "request.el", format!("{:?}", elapsed)));
-    rows_micro.push(("ELisp, request.el", elapsed.as_micros()));
-
-    let time = std::time::Instant::now();
-    env.call("jiroscope-benchmark-ureq-full", &args)?;
-    let elapsed = time.elapsed();
-    rows_verbose.push(("ELisp", "ureq", format!("{:?}", elapsed)));
-    rows_micro.push(("ELisp, ureq", elapsed.as_micros()));
-
-    let mut file = std::fs::File::create("jiroscope-benchmark.md")?;
-
-    write_tuples_to_md_table(&mut file, &["Caller", "Backend", "Time"], &rows_verbose)?;
-
-    let mut file = std::fs::File::create("jiroscope-benchmark-micro-data.py")?;
-
-    write_tuples_to_pyplot_data(&mut file, &["Caller", "Time"], &rows_micro)?;
-
-    ().into_lisp(env)
-}
-
-#[defun]
-fn benchmark_issues(env: &Env) -> Result<Value<'_>> {
-    let mut rows_verbose = vec![];
-    let mut rows_micro = vec![];
-
-    let time = std::time::Instant::now();
-    for _ in 0..100 {
-        get_jiroscope().get_all_issues()?;
-    }
-    let elapsed = time.elapsed();
-    rows_verbose.push(("Rust", "ureq", format!("{:?}", elapsed)));
-    rows_micro.push(("Rust, ureq", elapsed.as_micros()));
-
-    let args = vec![
-        "https://jiroscope-testing.atlassian.net/rest/api/3/search"
-            .to_string()
-            .into_lisp(env)?,
-        get_jiroscope().auth.get_basic_auth().into_lisp(env)?,
-    ];
-
-    let time = std::time::Instant::now();
-    for _ in 0..100 {
-        env.call("jiroscope-auth-benchmark-request-el", &args)?;
-    }
-    let elapsed = time.elapsed();
-    rows_verbose.push(("Rust", "request.el", format!("{:?}", elapsed)));
-    rows_micro.push(("Rust, request.el", elapsed.as_micros()));
-
-    let time = std::time::Instant::now();
-    env.call("jiroscope-auth-benchmark-request-el-full", &args)?;
-    let elapsed = time.elapsed();
-    rows_verbose.push(("ELisp", "request.el", format!("{:?}", elapsed)));
-    rows_micro.push(("ELisp, request.el", elapsed.as_micros()));
-
-    let time = std::time::Instant::now();
-    env.call("jiroscope-auth-benchmark-ureq-full", [])?;
-    let elapsed = time.elapsed();
-    rows_verbose.push(("ELisp", "ureq", format!("{:?}", elapsed)));
-    rows_micro.push(("ELisp, ureq", elapsed.as_micros()));
-
-    let mut file = std::fs::File::create("jiroscope-auth-benchmark.md")?;
-
-    write_tuples_to_md_table(&mut file, &["Caller", "Backend", "Time"], &rows_verbose)?;
-
-    let mut file = std::fs::File::create("jiroscope-auth-benchmark-micro-data.py")?;
-
-    write_tuples_to_pyplot_data(&mut file, &["Caller", "Time"], &rows_micro)?;
-
-    ().into_lisp(env)
-}
-
-// Define a function callable by Lisp code.
-#[cfg(test_server)]
-#[defun]
-fn create_note(env: &Env, message: String) -> Result<Value<'_>> {
-    let note = get_jiroscope().register_note(message)?;
-
-    let id = note.id.unwrap();
-
-    id.into_lisp(env)
-}
-
-#[cfg(test_server)]
-#[defun]
-fn get_notes(env: &Env) -> Result<Value<'_>> {
-    let notes = get_jiroscope().get_notes()?;
-
-    let v = env.make_vector(notes.len(), ())?;
-
-    for (i, note) in notes.iter().enumerate() {
-        v.set(i, note.message.clone().into_lisp(env)?)?;
-    }
-
-    v.into_lisp(env)
-}
-
-#[cfg(test_server)]
-#[defun]
-fn get_note_by_id(env: &Env, id: usize) -> Result<Value<'_>> {
-    let note = get_jiroscope().get_note_by_id(id)?;
-
-    note.message.into_lisp(env)
-}
-
-#[cfg(test_server)]
-#[defun]
-fn update_note_by_id(env: &Env, id: usize, message: String) -> Result<Value<'_>> {
-    let note = get_jiroscope().update_note_by_id(id, message)?;
-
-    note.message.into_lisp(env)
-}
-
 #[defun(user_ptr)]
 fn get_issue(_: &Env, issue_key: String) -> Result<Issue> {
     let issue = get_jiroscope().get_issue(&*issue_key)?;
@@ -205,6 +68,84 @@ fn get_issue_key<'e>(env: &'e Env, issue: &mut Issue) -> Result<Value<'e>> {
 #[defun]
 fn get_issue_summary<'e>(env: &'e Env, issue: &mut Issue) -> Result<Value<'e>> {
     issue.fields.summary.clone().into_lisp(env)
+}
+
+#[defun]
+fn create_issue(env: &Env) -> Result<Value<'_>> {
+    let mut projects: Vec<Project> = get_jiroscope().get_projects()?;
+
+    // let user choose project
+    let index = utils::prompt_select_index(
+        env,
+        "Choose which project to create the issue in: ",
+        projects
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
+
+    if index.is_none() {
+        return ().into_lisp(env);
+    }
+
+    let project = projects.remove(index.unwrap());
+
+    // let user choose issue type
+    let create_meta = get_jiroscope().get_issue_creation_meta()?;
+    let mut issue_types = create_meta
+        .projects
+        .into_iter()
+        .find(|p| p.id == project.id)
+        .unwrap()
+        .issue_types;
+
+    let index = utils::prompt_select_index(
+        env,
+        "Choose which issue type to create: ",
+        issue_types
+            .iter()
+            .map(|t| t.name.clone())
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
+
+    if index.is_none() {
+        return ().into_lisp(env);
+    }
+
+    let issue_type = issue_types.remove(index.unwrap());
+
+    // let user enter summary
+    let summary = utils::prompt_string(env, "Enter issue summary: ");
+
+    if summary.is_none() {
+        return ().into_lisp(env);
+    }
+
+    // let user enter description
+    let description = utils::prompt_string(env, "Enter issue description (or leave empty): ");
+
+    let description = description.filter(|d| !d.is_empty());
+
+    let issue_creation = IssueCreation {
+        fields: IssueCreationFields {
+            project,
+            issue_type,
+            summary: summary.unwrap(),
+            description,
+            priority: None,
+            assignee: None,
+        },
+    };
+
+    let issue = get_jiroscope().create_issue(issue_creation)?;
+
+    let args = vec![format!("Created issue {}.", issue.key).into_lisp(env)?];
+
+    env.call("message", &args)?;
+
+    ().into_lisp(env)
 }
 
 #[defun]

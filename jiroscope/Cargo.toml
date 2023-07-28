@@ -7,7 +7,10 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [features]
+default = []
+full = ["test_server", "benchmark"]
 test_server = ["jiroscope-core/test_server"]
+benchmark = []
 
 [dependencies]
 emacs = "0.18.0"

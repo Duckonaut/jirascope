@@ -1,7 +1,7 @@
 use emacs::{Env, IntoLisp, Result, Value};
 use serde::{Deserialize, Serialize};
 
-use crate::utils::{write_tuples_to_md_table, write_tuples_to_pyplot_data};
+use crate::{utils::{write_tuples_to_md_table, write_tuples_to_pyplot_data}, get_jiroscope};
 
 const BENCHMARK_ITERATIONS: usize = 100;
 
@@ -224,6 +224,106 @@ fn full_json_benchmark(env: &Env) -> Result<Value> {
 
     ().into_lisp(env)
 }
+
+#[emacs::defun]
+fn issues(env: &Env) -> Result<Value<'_>> {
+    let mut rows_verbose = vec![];
+    let mut rows_micro = vec![];
+
+    let time = std::time::Instant::now();
+    for _ in 0..100 {
+        get_jiroscope().get_all_issues()?;
+    }
+    let elapsed = time.elapsed();
+    rows_verbose.push(("Rust", "ureq", format!("{:?}", elapsed)));
+    rows_micro.push(("Rust, ureq", elapsed.as_micros()));
+
+    let args = vec![
+        "https://jiroscope-testing.atlassian.net/rest/api/3/search"
+            .to_string()
+            .into_lisp(env)?,
+        get_jiroscope().auth.get_basic_auth().into_lisp(env)?,
+    ];
+
+    let time = std::time::Instant::now();
+    for _ in 0..100 {
+        env.call("jiroscope-auth-benchmark-request-el", &args)?;
+    }
+    let elapsed = time.elapsed();
+    rows_verbose.push(("Rust", "request.el", format!("{:?}", elapsed)));
+    rows_micro.push(("Rust, request.el", elapsed.as_micros()));
+
+    let time = std::time::Instant::now();
+    env.call("jiroscope-auth-benchmark-request-el-full", &args)?;
+    let elapsed = time.elapsed();
+    rows_verbose.push(("ELisp", "request.el", format!("{:?}", elapsed)));
+    rows_micro.push(("ELisp, request.el", elapsed.as_micros()));
+
+    let time = std::time::Instant::now();
+    env.call("jiroscope-auth-benchmark-ureq-full", [])?;
+    let elapsed = time.elapsed();
+    rows_verbose.push(("ELisp", "ureq", format!("{:?}", elapsed)));
+    rows_micro.push(("ELisp, ureq", elapsed.as_micros()));
+
+    let mut file = std::fs::File::create("jiroscope-auth-benchmark.md")?;
+
+    write_tuples_to_md_table(&mut file, &["Caller", "Backend", "Time"], &rows_verbose)?;
+
+    let mut file = std::fs::File::create("jiroscope-auth-benchmark-micro-data.py")?;
+
+    write_tuples_to_pyplot_data(&mut file, &["Caller", "Time"], &rows_micro)?;
+
+    ().into_lisp(env)
+}
+
+#[cfg(feature = "test_server")]
+#[emacs::defun]
+fn test_server(env: &Env) -> Result<Value<'_>> {
+    let mut rows_verbose = vec![];
+    let mut rows_micro = vec![];
+
+    let time = std::time::Instant::now();
+    for _ in 0..100 {
+        get_jiroscope().get_notes()?;
+    }
+    let elapsed = time.elapsed();
+    rows_verbose.push(("Rust", "ureq", format!("{:?}", elapsed)));
+    rows_micro.push(("Rust, ureq", elapsed.as_micros()));
+    
+
+    let args = vec!["http://localhost:1937/notes".to_string().into_lisp(env)?];
+
+    let time = std::time::Instant::now();
+    for _ in 0..100 {
+        env.call("jiroscope-benchmark-request-el", &args)?;
+    }
+    let elapsed = time.elapsed();
+    rows_verbose.push(("Rust", "request.el", format!("{:?}", elapsed)));
+    rows_micro.push(("Rust, request.el", elapsed.as_micros()));
+
+    let time = std::time::Instant::now();
+    env.call("jiroscope-benchmark-request-el-full", &args)?;
+    let elapsed = time.elapsed();
+    rows_verbose.push(("ELisp", "request.el", format!("{:?}", elapsed)));
+    rows_micro.push(("ELisp, request.el", elapsed.as_micros()));
+
+    let time = std::time::Instant::now();
+    env.call("jiroscope-benchmark-ureq-full", &args)?;
+    let elapsed = time.elapsed();
+    rows_verbose.push(("ELisp", "ureq", format!("{:?}", elapsed)));
+    rows_micro.push(("ELisp, ureq", elapsed.as_micros()));
+
+    let mut file = std::fs::File::create("jiroscope-benchmark.md")?;
+
+    write_tuples_to_md_table(&mut file, &["Caller", "Backend", "Time"], &rows_verbose)?;
+
+    let mut file = std::fs::File::create("jiroscope-benchmark-micro-data.py")?;
+
+    write_tuples_to_pyplot_data(&mut file, &["Caller", "Time"], &rows_micro)?;
+
+    ().into_lisp(env)
+}
+
 
 fn gen_test_tree_string(depth: usize) -> String {
     let mut tree = TestTree {

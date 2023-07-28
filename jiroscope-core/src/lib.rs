@@ -1,6 +1,7 @@
-use jira::{IssueCreationMeta, IssueEvent, Issues, IssueEditMeta};
+use jira::{
+    CreatedIssue, IssueCreation, IssueCreationMeta, IssueEditMeta, IssueEvent, Issues, Project,
+};
 use serde::{Deserialize, Serialize};
-use ureq::post;
 
 mod auth;
 mod config;
@@ -35,18 +36,18 @@ impl Jiroscope {
         Ok(())
     }
 
-    #[cfg(test_server)]
+    #[cfg(feature = "test_server")]
     pub fn register_note(&self, message: String) -> Result<Note, crate::Error> {
         let note = Note { id: None, message };
 
-        let response = post("http://localhost:1937/notes").send_json(note)?;
+        let response = ureq::post("http://localhost:1937/notes").send_json(note)?;
 
         let note: Note = response.into_json()?;
 
         Ok(note)
     }
 
-    #[cfg(test_server)]
+    #[cfg(feature = "test_server")]
     pub fn get_notes(&self) -> Result<Vec<Note>, crate::Error> {
         let response = ureq::get("http://localhost:1937/notes").call()?;
 
@@ -55,7 +56,7 @@ impl Jiroscope {
         Ok(notes)
     }
 
-    #[cfg(test_server)]
+    #[cfg(feature = "test_server")]
     pub fn get_note_by_id(&self, id: usize) -> Result<Note, crate::Error> {
         let response = ureq::get(&format!("http://localhost:1937/notes/{}", id)).call()?;
 
@@ -64,7 +65,7 @@ impl Jiroscope {
         Ok(note)
     }
 
-    #[cfg(test_server)]
+    #[cfg(feature = "test_server")]
     pub fn update_note_by_id(&self, id: usize, message: String) -> Result<Note, crate::Error> {
         let note = Note {
             id: Some(id),
@@ -76,6 +77,14 @@ impl Jiroscope {
         let note: Note = response.into_json()?;
 
         Ok(note)
+    }
+
+    pub fn get_projects(&mut self) -> Result<Vec<Project>, crate::Error> {
+        let response = self.api_get("project")?;
+
+        let projects: Vec<Project> = response.into_json()?;
+
+        Ok(projects)
     }
 
     pub fn get_issue<'a>(&mut self, issue_id: impl Into<&'a str>) -> Result<Issue, crate::Error> {
@@ -121,6 +130,14 @@ impl Jiroscope {
         Ok(issue_events)
     }
 
+    pub fn create_issue(&mut self, issue: IssueCreation) -> Result<CreatedIssue, crate::Error> {
+        let response = self.api_post("issue", issue)?;
+
+        let created_issue: CreatedIssue = response.into_json()?;
+
+        Ok(created_issue)
+    }
+
     fn api_get(&mut self, path: &str) -> Result<ureq::Response, crate::Error> {
         let response = self
             .auth
@@ -128,6 +145,25 @@ impl Jiroscope {
                 format!("{}/rest/api/3/{}", &self.config.api_url, path).as_str(),
             ))
             .call()?;
+
+        Ok(response)
+    }
+
+    fn api_post(
+        &mut self,
+        path: &str,
+        body: impl Serialize,
+    ) -> Result<ureq::Response, crate::Error> {
+        let json = ureq::serde_json::to_string(&body).unwrap();
+
+        println!("{}", json);
+
+        let response = self
+            .auth
+            .auth(ureq::post(
+                format!("{}/rest/api/3/{}", &self.config.api_url, path).as_str(),
+            ))
+            .send_json(body)?;
 
         Ok(response)
     }

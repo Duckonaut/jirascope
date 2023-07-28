@@ -1,6 +1,7 @@
+use std::fmt::Display;
+
 use emacs::{Env, IntoLisp};
 
-#[allow(dead_code)]
 pub fn dump_string_to_buffer(env: &Env, buffer_name: &str, string: &str) {
     let args = vec![buffer_name.to_string().into_lisp(env).unwrap()];
     let buffer = env.call("get-buffer-create", &args).unwrap();
@@ -122,4 +123,34 @@ pub fn write_tuples_to_pyplot_data<T: AsRow>(
     writeln!(w, "]")?;
 
     Ok(())
+}
+
+pub fn prompt_select_index(
+    env: &Env,
+    prompt: &str,
+    choices: &[impl AsRef<str> + Display + PartialEq<String>],
+) -> Option<usize> {
+    let options = env
+        .list(
+            choices
+                .iter()
+                .map(|c| c.to_string().into_lisp(env).unwrap())
+                .collect::<Vec<_>>()
+                .as_slice(),
+        )
+        .unwrap();
+
+    let args = vec![prompt.to_string().into_lisp(env).unwrap(), options];
+    let choice = env.call("completing-read", &args).unwrap();
+
+    let choice = choice.into_rust::<String>().unwrap();
+
+    choices.iter().position(|x| *x == choice)
+}
+
+pub fn prompt_string(env: &Env, prompt: &str) -> Option<String> {
+    let args = vec![prompt.to_string().into_lisp(env).unwrap()];
+    let choice = env.call("read-string", &args).unwrap();
+
+    choice.into_rust::<String>().ok()
 }
