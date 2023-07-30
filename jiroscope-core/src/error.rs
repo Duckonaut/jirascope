@@ -1,11 +1,14 @@
 use std::fmt::{Display, Formatter};
 
+use crate::jira;
+
 #[derive(Debug)]
 pub enum Error {
     Jiroscope { message: String },
     Auth { message: String },
     Io(std::io::Error),
     Ureq(Box<ureq::Error>), // ureq::Error is Big
+    Jira(u16, jira::ErrorCollection),
 }
 
 impl Error {
@@ -41,6 +44,7 @@ impl Display for Error {
             Error::Auth { message } => write!(f, "Auth error: {}", message),
             Error::Io(e) => write!(f, "IO error: {}", e),
             Error::Ureq(e) => write!(f, "Ureq error: {}", e),
+            Error::Jira(code, e) => write!(f, "Jira error {}: {}", code, e),
         }
     }
 }

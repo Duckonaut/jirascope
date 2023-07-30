@@ -1,7 +1,8 @@
 use jira::{
-    CreatedIssue, IssueCreation, IssueCreationMeta, IssueEditMeta, IssueEvent, Issues, Project,
+    CreatedIssue, IssueCreation, IssueCreationMeta, IssueEdit, IssueEditMeta, IssueEvent, Issues,
+    Project,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 mod auth;
 mod config;
@@ -12,6 +13,8 @@ pub use auth::Auth;
 pub use config::Config;
 pub use error::Error;
 
+pub use ureq;
+
 use crate::jira::Issue;
 
 pub struct Jiroscope {
@@ -19,6 +22,7 @@ pub struct Jiroscope {
     pub auth: Auth,
 }
 
+#[cfg(feature = "test_server")]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Note {
     pub id: Option<usize>,
@@ -138,15 +142,40 @@ impl Jiroscope {
         Ok(created_issue)
     }
 
+    pub fn edit_issue<'a>(
+        &mut self,
+        issue_id: impl Into<&'a str>,
+        issue: IssueEdit,
+    ) -> Result<(), crate::Error> {
+        self.api_put(format!("issue/{}", issue_id.into()).as_str(), issue)?;
+
+        Ok(())
+    }
+
+    pub fn delete_issue<'a>(&mut self, issue_id: impl Into<&'a str>) -> Result<(), crate::Error> {
+        self.api_delete(format!("issue/{}", issue_id.into()).as_str())?;
+
+        Ok(())
+    }
+
     fn api_get(&mut self, path: &str) -> Result<ureq::Response, crate::Error> {
-        let response = self
+        match self
             .auth
             .auth(ureq::get(
                 format!("{}/rest/api/3/{}", &self.config.api_url, path).as_str(),
             ))
-            .call()?;
-
-        Ok(response)
+            .call()
+        {
+            Ok(response) => Ok(response),
+            Err(error) => match error {
+                ureq::Error::Status(code, response) => {
+                    Err(crate::Error::Jira(code, response.into_json()?))
+                }
+                ureq::Error::Transport(e) => {
+                    Err(crate::Error::Ureq(Box::new(ureq::Error::Transport(e))))
+                }
+            },
+        }
     }
 
     fn api_post(
@@ -154,17 +183,66 @@ impl Jiroscope {
         path: &str,
         body: impl Serialize,
     ) -> Result<ureq::Response, crate::Error> {
-        let json = ureq::serde_json::to_string(&body).unwrap();
-
-        println!("{}", json);
-
-        let response = self
+        match self
             .auth
             .auth(ureq::post(
                 format!("{}/rest/api/3/{}", &self.config.api_url, path).as_str(),
             ))
-            .send_json(body)?;
+            .send_json(body)
+        {
+            Ok(response) => Ok(response),
+            Err(error) => match error {
+                ureq::Error::Status(code, response) => {
+                    Err(crate::Error::Jira(code, response.into_json()?))
+                }
+                ureq::Error::Transport(e) => {
+                    Err(crate::Error::Ureq(Box::new(ureq::Error::Transport(e))))
+                }
+            },
+        }
+    }
 
-        Ok(response)
+    fn api_delete(&mut self, path: &str) -> Result<ureq::Response, crate::Error> {
+        match self
+            .auth
+            .auth(ureq::delete(
+                format!("{}/rest/api/3/{}", &self.config.api_url, path).as_str(),
+            ))
+            .call()
+        {
+            Ok(response) => Ok(response),
+            Err(error) => match error {
+                ureq::Error::Status(code, response) => {
+                    Err(crate::Error::Jira(code, response.into_json()?))
+                }
+                ureq::Error::Transport(e) => {
+                    Err(crate::Error::Ureq(Box::new(ureq::Error::Transport(e))))
+                }
+            },
+        }
+    }
+
+    fn api_put(
+        &mut self,
+        path: &str,
+        body: impl Serialize,
+    ) -> Result<ureq::Response, crate::Error> {
+        match self
+            .auth
+            .auth(ureq::put(
+                format!("{}/rest/api/3/{}", &self.config.api_url, path).as_str(),
+            ))
+            .send_json(body)
+        {
+            Ok(response) => Ok(response),
+            Err(error) => match error {
+                ureq::Error::Status(code, response) => {
+                    Err(crate::Error::Jira(code, response.into_json()?))
+                }
+                ureq::Error::Transport(e) => {
+                    Err(crate::Error::Ureq(Box::new(ureq::Error::Transport(e))))
+                }
+            },
+        }
     }
 }

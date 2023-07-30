@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use ureq::serde_json::Value;
 
-use super::Project;
+use super::{Project, AtlassianDoc};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Issues {
@@ -20,7 +20,7 @@ pub struct Issue {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssueFields {
     pub summary: String,
-    pub description: Option<String>,
+    pub description: Option<AtlassianDoc>,
     pub priority: Priority,
     pub status: Status,
     pub assignee: Option<User>,
@@ -42,7 +42,7 @@ pub struct IssueCreationFields {
     pub issue_type: IssueType,
     pub summary: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    pub description: Option<AtlassianDoc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<Priority>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -55,6 +55,25 @@ pub struct CreatedIssue {
     pub key: String,
     #[serde(rename = "self")]
     pub self_link: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct IssueEdit {
+    pub fields: IssueEditFields,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct IssueEditFields {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<AtlassianDoc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<Priority>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<Status>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<Option<User>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

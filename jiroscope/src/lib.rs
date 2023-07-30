@@ -4,7 +4,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use emacs::{defun, Env, IntoLisp, Result, Value};
 use jiroscope_core::{
-    jira::{Issue, IssueCreation, IssueCreationFields, Issues, Project},
+    jira::{AtlassianDoc, Issue, IssueCreation, IssueCreationFields, IssueEdit, Issues, Project},
     Auth, Config, Jiroscope,
 };
 
@@ -133,7 +133,7 @@ fn create_issue(env: &Env) -> Result<Value<'_>> {
             project,
             issue_type,
             summary: summary.unwrap(),
-            description,
+            description: description.map(|d| AtlassianDoc::text(&d)),
             priority: None,
             assignee: None,
         },
@@ -142,6 +142,59 @@ fn create_issue(env: &Env) -> Result<Value<'_>> {
     let issue = get_jiroscope().create_issue(issue_creation)?;
 
     let args = vec![format!("Created issue {}.", issue.key).into_lisp(env)?];
+
+    env.call("message", &args)?;
+
+    ().into_lisp(env)
+}
+
+#[defun]
+fn edit_issue(env: &Env) -> Result<Value<'_>> {
+    // let user choose issue
+    let mut issues = get_jiroscope().get_all_issues()?.issues;
+
+    let index = utils::prompt_select_index(
+        env,
+        "Choose which issue to edit: ",
+        issues
+            .iter()
+            .map(|t| t.key.clone())
+            .collect::<Vec<_>>()
+            .as_slice(),
+    );
+
+    if index.is_none() {
+        return ().into_lisp(env);
+    }
+
+    let issue = issues.remove(index.unwrap());
+    let mut issue_edit = IssueEdit::default();
+
+    // let user enter summary
+    issue_edit.fields.summary =
+        utils::prompt_string(env, "Enter issue summary (or leave empty to leave as is): ");
+
+    // let user enter description
+    issue_edit.fields.description = utils::prompt_string(
+        env,
+        "Enter issue description (or leave empty to leave as is): ",
+    )
+    .map(|d| AtlassianDoc::text(&d));
+
+    get_jiroscope().edit_issue(&*issue.key, issue_edit)?;
+
+    let args = vec![format!("Created issue {}.", issue.key).into_lisp(env)?];
+
+    env.call("message", &args)?;
+
+    ().into_lisp(env)
+}
+
+#[defun]
+fn delete_issue(env: &Env, issue_key: String) -> Result<Value<'_>> {
+    get_jiroscope().delete_issue(&*issue_key)?;
+
+    let args = vec![format!("Deleted issue {}.", issue_key).into_lisp(env)?];
 
     env.call("message", &args)?;
 
@@ -170,7 +223,7 @@ fn display_issue(env: &Env, issue_key: String) -> Result<Value<'_>> {
     env.call("newline", &args)?;
 
     if let Some(description) = issue.fields.description {
-        let args = vec![format!("Description: {}", description).into_lisp(env)?];
+        let args = vec![format!("Description: {}", description.to_markdown()).into_lisp(env)?];
 
         env.call("insert", &args)?;
 
