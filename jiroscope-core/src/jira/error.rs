@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use serde::{Deserialize, Serialize};
 
@@ -12,26 +12,20 @@ use serde::{Deserialize, Serialize};
 pub struct ErrorCollection {
     #[serde(rename = "errorMessages")]
     pub error_messages: Vec<String>,
-    #[serde(rename = "errors")]
-    pub errors: JiraErrors,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JiraErrors {
-    pub description: Option<String>,
+    pub errors: HashMap<String, String>,
 }
 
 impl Display for ErrorCollection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(error) = &self.errors.description {
+        let mut errors = self
+            .error_messages
+            .iter()
+            .cloned()
+            .chain(self.errors.iter().map(|(k, v)| format!("{}: {}", k, v)));
+
+        if let Some(error) = errors.next() {
             write!(f, "{}", error)?;
-            for error in &self.error_messages {
-                write!(f, ", {}", error)?;
-            }
-            Ok(())
-        } else if let Some(error) = self.error_messages.first() {
-            write!(f, "{}", error)?;
-            for error in &self.error_messages[1..] {
+            for error in errors {
                 write!(f, ", {}", error)?;
             }
             Ok(())

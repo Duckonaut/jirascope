@@ -10,3 +10,4 @@ test_server = []
 ureq = { version = "2.6.2", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 base64 = "0.21.0"
+markdown = "1.0.0-alpha.11"

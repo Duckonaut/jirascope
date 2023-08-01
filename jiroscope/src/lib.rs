@@ -133,7 +133,7 @@ fn create_issue(env: &Env) -> Result<Value<'_>> {
             project,
             issue_type,
             summary: summary.unwrap(),
-            description: description.map(|d| AtlassianDoc::text(&d)),
+            description: description.map(|d| AtlassianDoc::from_markdown(&d)),
             priority: None,
             assignee: None,
         },
@@ -174,12 +174,16 @@ fn edit_issue(env: &Env) -> Result<Value<'_>> {
     issue_edit.fields.summary =
         utils::prompt_string(env, "Enter issue summary (or leave empty to leave as is): ");
 
+    if issue_edit.fields.summary.is_none() {
+        issue_edit.fields.summary = Some(issue.fields.summary);
+    }
+
     // let user enter description
     issue_edit.fields.description = utils::prompt_string(
         env,
         "Enter issue description (or leave empty to leave as is): ",
     )
-    .map(|d| AtlassianDoc::text(&d));
+    .map(|d| AtlassianDoc::from_markdown(&d));
 
     get_jiroscope().edit_issue(&*issue.key, issue_edit)?;
 

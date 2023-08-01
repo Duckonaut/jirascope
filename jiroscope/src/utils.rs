@@ -152,5 +152,7 @@ pub fn prompt_string(env: &Env, prompt: &str) -> Option<String> {
     let args = vec![prompt.to_string().into_lisp(env).unwrap()];
     let choice = env.call("read-string", &args).unwrap();
 
-    choice.into_rust::<String>().ok()
+    let s = choice.into_rust::<String>().ok();
+
+    s.filter(|s| !s.is_empty())
 }

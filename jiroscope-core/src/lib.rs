@@ -147,6 +147,7 @@ impl Jiroscope {
         issue_id: impl Into<&'a str>,
         issue: IssueEdit,
     ) -> Result<(), crate::Error> {
+        println!("{:?}", issue);
         self.api_put(format!("issue/{}", issue_id.into()).as_str(), issue)?;
 
         Ok(())

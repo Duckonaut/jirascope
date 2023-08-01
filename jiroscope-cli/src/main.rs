@@ -129,13 +129,10 @@ fn main() {
             status,
             assignee,
         } => {
-            let issue =
-                handle_error(jiroscope.get_issue(format!("{}-{}", board_id, issue_id).as_str()));
-
             let mut issue_edit = IssueEdit::default();
 
             issue_edit.fields.summary = summary;
-            issue_edit.fields.description = description.map(|d| AtlassianDoc::text(&d));
+            issue_edit.fields.description = description.map(|d| AtlassianDoc::from_markdown(&d));
             // TODO: rest of the fields
 
             handle_error(
