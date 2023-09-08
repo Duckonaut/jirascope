@@ -23,7 +23,14 @@ static JIROSCOPE_BUFFER_NAME: &str = "*jiroscope*";
 
 // Register the initialization hook that Emacs will call when it loads the module.
 #[emacs::module]
-fn init(_: &Env) -> Result<()> {
+fn init(env: &Env) -> Result<()> {
+    env.call(
+        "set",
+        (
+            env.intern("jiroscope-dyn--version")?,
+            option_env!("CARGO_PKG_VERSION"),
+        ),
+    )?;
     Ok(())
 }
 

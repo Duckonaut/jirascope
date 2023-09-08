@@ -5,12 +5,14 @@
 
 ;; Load the dynamic module at compile time as well, to satisfy the byte compiler.
 (eval-and-compile
-  (defconst jiroscope--dyn-version "0.1.0"
+  (defconst jiroscope--dyn-version "0.0.1"
     "Required version of the dynamic module `jiroscope-dyn'.")
   (require 'jiroscope-dyn-get)
   (jiroscope-dyn-get-ensure jiroscope--dyn-version))
 
-(defun jiroscope-i-am-here () (message "hi"))
+;; take any number of arguments
+(defun jiroscope-setup (url login api_token)
+  (jiroscope-dyn-setup url login api_token))
 
 (require 'jiroscope-dyn)
 

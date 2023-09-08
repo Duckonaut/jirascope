@@ -129,10 +129,7 @@ This function records the downloaded version in the manifest
          (default-directory bin-dir)
          (_ (unless (file-directory-p bin-dir) (make-directory bin-dir)))
          (local-name (jiroscope-dyn-get--file))
-         (remote-name ((if system-specific?
-                            (jiroscope-dyn-get--system-specific-file)
-                            local-name)
-                      ))
+         (remote-name local-name)
          (url (format "https://github.com/duckonaut/jiroscope/releases/download/%s/%s"
                       version remote-name)))
     (jiroscope-dyn-get--log "Downloading %s" url)
