@@ -477,16 +477,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "453ad9f582a441959e5f0d088b02ce04cfe8d51a8eaf077f12ac6d3e94164ca6"
 
 [[package]]
-name = "jiroscope"
-version = "0.1.0"
-dependencies = [
- "emacs",
- "jiroscope-core",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "jiroscope-cli"
 version = "0.1.0"
 dependencies = [
@@ -503,6 +493,16 @@ dependencies = [
  "markdown",
  "serde",
  "ureq",
+]
+
+[[package]]
+name = "jiroscope-dyn"
+version = "0.1.0"
+dependencies = [
+ "emacs",
+ "jiroscope-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -72,7 +72,8 @@ fn get_issue_summary<'e>(env: &'e Env, issue: &mut Issue) -> Result<Value<'e>> {
 
 #[defun]
 fn create_issue(env: &Env) -> Result<Value<'_>> {
-    let mut projects: Vec<Project> = get_jiroscope().get_projects()?;
+    let mut jiroscope = get_jiroscope();
+    let mut projects: Vec<Project> = jiroscope.get_projects()?;
 
     // let user choose project
     let index = utils::prompt_select_index(
@@ -92,7 +93,7 @@ fn create_issue(env: &Env) -> Result<Value<'_>> {
     let project = projects.remove(index.unwrap());
 
     // let user choose issue type
-    let create_meta = get_jiroscope().get_issue_creation_meta()?;
+    let create_meta = jiroscope.get_issue_creation_meta()?;
     let mut issue_types = create_meta
         .projects
         .into_iter()
@@ -139,7 +140,7 @@ fn create_issue(env: &Env) -> Result<Value<'_>> {
         },
     };
 
-    let issue = get_jiroscope().create_issue(issue_creation)?;
+    let issue = jiroscope.create_issue(issue_creation)?;
 
     let args = vec![format!("Created issue {}.", issue.key).into_lisp(env)?];
 
@@ -150,8 +151,9 @@ fn create_issue(env: &Env) -> Result<Value<'_>> {
 
 #[defun]
 fn edit_issue(env: &Env) -> Result<Value<'_>> {
+    let mut jiroscope = get_jiroscope();
     // let user choose issue
-    let mut issues = get_jiroscope().get_all_issues()?.issues;
+    let mut issues = jiroscope.get_all_issues()?.issues;
 
     let index = utils::prompt_select_index(
         env,
@@ -185,7 +187,7 @@ fn edit_issue(env: &Env) -> Result<Value<'_>> {
     )
     .map(|d| AtlassianDoc::from_markdown(&d));
 
-    get_jiroscope().edit_issue(&*issue.key, issue_edit)?;
+    jiroscope.edit_issue(&*issue.key, issue_edit)?;
 
     let args = vec![format!("Created issue {}.", issue.key).into_lisp(env)?];
 

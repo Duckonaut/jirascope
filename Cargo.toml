@@ -3,7 +3,7 @@ resolver = "2"
 
 members = [
     "jiroscope-core",
-    "jiroscope",
+    "jiroscope-dyn",
     "jiroscope-cli",
     "jiroscope-test-server",
 ]
