@@ -11,3 +11,8 @@ members = [
 exclude = [
 ]
 
+# optimize for size
+[profile.release]
+opt-level = "z"
+lto = true
+debug = false
