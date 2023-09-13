@@ -156,11 +156,10 @@ fn create_issue(env: &Env) -> Result<Value<'_>> {
     ().into_lisp(env)
 }
 
-#[defun]
-fn edit_issue(env: &Env) -> Result<Value<'_>> {
+fn prompt_issue(env: &Env) -> Option<Issue> {
     let mut jiroscope = get_jiroscope();
     // let user choose issue
-    let mut issues = jiroscope.get_all_issues()?.issues;
+    let mut issues = jiroscope.get_all_issues().unwrap().issues;
 
     let index = utils::prompt_select_index(
         env,
@@ -170,13 +169,21 @@ fn edit_issue(env: &Env) -> Result<Value<'_>> {
             .map(|t| t.key.clone())
             .collect::<Vec<_>>()
             .as_slice(),
-    );
+    )?;
 
-    if index.is_none() {
+    Some(issues.remove(index))
+}
+
+#[defun]
+fn edit_issue_interactive(env: &Env) -> Result<Value<'_>> {
+    let issue = prompt_issue(env);
+
+    if issue.is_none() {
         return ().into_lisp(env);
     }
 
-    let issue = issues.remove(index.unwrap());
+    let issue = issue.unwrap();
+
     let mut issue_edit = IssueEdit::default();
 
     // let user enter summary
@@ -194,7 +201,7 @@ fn edit_issue(env: &Env) -> Result<Value<'_>> {
     )
     .map(|d| AtlassianDoc::from_markdown(&d));
 
-    jiroscope.edit_issue(&*issue.key, issue_edit)?;
+    get_jiroscope().edit_issue(&*issue.key, issue_edit)?;
 
     let args = vec![format!("Created issue {}.", issue.key).into_lisp(env)?];
 
@@ -207,7 +214,22 @@ fn edit_issue(env: &Env) -> Result<Value<'_>> {
 fn delete_issue(env: &Env, issue_key: String) -> Result<Value<'_>> {
     get_jiroscope().delete_issue(&*issue_key)?;
 
-    let args = vec![format!("Deleted issue {}.", issue_key).into_lisp(env)?];
+    ().into_lisp(env)
+}
+
+#[defun]
+fn delete_issue_interactive(env: &Env) -> Result<Value<'_>> {
+    let issue = prompt_issue(env);
+
+    if issue.is_none() {
+        return ().into_lisp(env);
+    }
+
+    let issue = issue.unwrap();
+
+    get_jiroscope().delete_issue(&*issue.key)?;
+
+    let args = vec![format!("Deleted issue {}.", issue.key).into_lisp(env)?];
 
     env.call("message", &args)?;
 
@@ -252,6 +274,21 @@ fn display_issue(env: &Env, issue_key: String) -> Result<Value<'_>> {
     let args = vec![];
 
     env.call("newline", &args)?;
+
+    ().into_lisp(env)
+}
+
+#[defun]
+fn display_issue_interactive(env: &Env) -> Result<Value<'_>> {
+    let issue = prompt_issue(env);
+
+    if issue.is_none() {
+        return ().into_lisp(env);
+    }
+
+    let issue = issue.unwrap();
+
+    display_issue(env, issue.key)?;
 
     ().into_lisp(env)
 }

@@ -10,10 +10,26 @@
   (require 'jiroscope-dyn-get)
   (jiroscope-dyn-get-ensure jiroscope--dyn-version))
 
-;; take any number of arguments
+(require 'jiroscope-dyn)
+
 (defun jiroscope-setup (url login api_token)
   (jiroscope-dyn-setup url login api_token))
 
-(require 'jiroscope-dyn)
+;; add bindings for interactive use
+(defun jiroscope-delete-issue ()
+  (interactive)
+  (jiroscope-dyn-delete-issue-interactive))
+
+(defun jiroscope-display-issue ()
+  (interactive)
+  (jiroscope-dyn-display-issue-interactive))
+
+(defun jiroscope-create-issue ()
+  (interactive)
+  (jiroscope-dyn-create-issue))
+
+(defun jiroscope-edit-issue ()
+  (interactive)
+  (jiroscope-dyn-edit-issue))
 
 (provide 'jiroscope)
