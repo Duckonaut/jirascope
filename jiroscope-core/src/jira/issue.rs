@@ -83,6 +83,7 @@ pub struct Priority {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Status {
+    pub id: String,
     pub name: String,
 }
 
@@ -152,3 +153,21 @@ pub struct MetaFieldSchema {
     pub custom: Option<String>,
     pub custom_id: Option<isize>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueTransitionDescriptor {
+    pub id: String,
+    pub name: String,
+    pub to: Status,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueTransitionDescriptors {
+    pub transitions: Vec<IssueTransitionDescriptor>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueTransition {
+    pub transition: IssueTransitionDescriptor,
+}
+

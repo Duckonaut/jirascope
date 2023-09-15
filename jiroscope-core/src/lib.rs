@@ -1,6 +1,6 @@
 use jira::{
-    CreatedIssue, IssueCreation, IssueCreationMeta, IssueEdit, IssueEditMeta, IssueEvent, Issues,
-    Project,
+    CreatedIssue, IssueCreation, IssueCreationMeta, IssueEdit, IssueEditMeta, IssueEvent,
+    IssueTransition, IssueTransitionDescriptors, Issues, Project, IssueTransitionDescriptor,
 };
 use serde::Serialize;
 
@@ -155,6 +155,31 @@ impl Jiroscope {
 
     pub fn delete_issue<'a>(&mut self, issue_id: impl Into<&'a str>) -> Result<(), crate::Error> {
         self.api_delete(format!("issue/{}", issue_id.into()).as_str())?;
+
+        Ok(())
+    }
+
+    pub fn get_issue_transitions(
+        &mut self,
+        issue_id: &str,
+    ) -> Result<IssueTransitionDescriptors, crate::Error> {
+        let response = self.api_get(format!("issue/{}/transitions", issue_id).as_str())?;
+
+        let issue_transitions: IssueTransitionDescriptors = response.into_json()?;
+
+        Ok(issue_transitions)
+    }
+
+    pub fn transition_issue(
+        &mut self,
+        issue_id: &str,
+        transition: IssueTransitionDescriptor,
+    ) -> Result<(), crate::Error> {
+        let transition = IssueTransition { transition };
+        self.api_post(
+            format!("issue/{}/transitions", issue_id).as_str(),
+            transition,
+        )?;
 
         Ok(())
     }
