@@ -4,7 +4,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use emacs::{defun, Env, IntoLisp, Result, Value};
 use jiroscope_core::{
-    jira::{AtlassianDoc, Issue, IssueCreation, IssueCreationFields, IssueEdit, Issues, Project},
+    jira::{AtlassianDoc, Issue, IssueCreation, IssueCreationFields, IssueEdit, Issues, Project, IssueTransitionDescriptor},
     Auth, Config, Jiroscope,
 };
 
@@ -163,7 +163,7 @@ fn prompt_issue(env: &Env) -> Option<Issue> {
 
     let index = utils::prompt_select_index(
         env,
-        "Choose which issue to edit: ",
+        "Choose issue: ",
         issues
             .iter()
             .map(|t| t.key.clone())
@@ -172,6 +172,24 @@ fn prompt_issue(env: &Env) -> Option<Issue> {
     )?;
 
     Some(issues.remove(index))
+}
+
+fn prompt_issue_transition(env: &Env, issue_key: &str) -> Option<IssueTransitionDescriptor> {
+    let mut jiroscope = get_jiroscope();
+    // let user choose issue status
+    let mut issue_transitions = jiroscope.get_issue_transitions(issue_key).unwrap().transitions;
+
+    let index = utils::prompt_select_index(
+        env,
+        "Choose issue status: ",
+        issue_transitions
+            .iter()
+            .map(|t| t.name.clone())
+            .collect::<Vec<_>>()
+            .as_slice(),
+    )?;
+
+    Some(issue_transitions.remove(index))
 }
 
 #[defun]
@@ -230,6 +248,33 @@ fn delete_issue_interactive(env: &Env) -> Result<Value<'_>> {
     get_jiroscope().delete_issue(&*issue.key)?;
 
     let args = vec![format!("Deleted issue {}.", issue.key).into_lisp(env)?];
+
+    env.call("message", &args)?;
+
+    ().into_lisp(env)
+}
+
+#[defun]
+fn transition_issue_interactive(env: &Env) -> Result<Value<'_>> {
+    let issue = prompt_issue(env);
+
+    if issue.is_none() {
+        return ().into_lisp(env);
+    }
+
+    let issue = issue.unwrap();
+
+    let transition = prompt_issue_transition(env, &issue.key);
+
+    if transition.is_none() {
+        return ().into_lisp(env);
+    }
+
+    let transition = transition.unwrap();
+
+    get_jiroscope().transition_issue(issue.key.as_str(), transition)?;
+
+    let args = vec![format!("Transitioned issue {}.", issue.key).into_lisp(env)?];
 
     env.call("message", &args)?;
 

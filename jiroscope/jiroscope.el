@@ -32,4 +32,8 @@
   (interactive)
   (jiroscope-dyn-edit-issue))
 
+(defun jiroscope-transition-issue ()
+  (interactive)
+  (jiroscope-dyn-transition-issue-interactive))
+
 (provide 'jiroscope)
