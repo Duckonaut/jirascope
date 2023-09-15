@@ -36,4 +36,9 @@
   (interactive)
   (jiroscope-dyn-transition-issue-interactive))
 
+(defface jiroscope-issue-key
+  '((t (:inherit info-title-1)))
+  "Face used for issue key headers."
+  :group 'jiroscope)
+
 (provide 'jiroscope)

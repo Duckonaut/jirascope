@@ -4,7 +4,10 @@ use std::sync::{Mutex, MutexGuard};
 
 use emacs::{defun, Env, IntoLisp, Result, Value};
 use jiroscope_core::{
-    jira::{AtlassianDoc, Issue, IssueCreation, IssueCreationFields, IssueEdit, Issues, Project, IssueTransitionDescriptor},
+    jira::{
+        AtlassianDoc, Issue, IssueCreation, IssueCreationFields, IssueEdit,
+        IssueTransitionDescriptor, Issues, Project,
+    },
     Auth, Config, Jiroscope,
 };
 
@@ -177,7 +180,10 @@ fn prompt_issue(env: &Env) -> Option<Issue> {
 fn prompt_issue_transition(env: &Env, issue_key: &str) -> Option<IssueTransitionDescriptor> {
     let mut jiroscope = get_jiroscope();
     // let user choose issue status
-    let mut issue_transitions = jiroscope.get_issue_transitions(issue_key).unwrap().transitions;
+    let mut issue_transitions = jiroscope
+        .get_issue_transitions(issue_key)
+        .unwrap()
+        .transitions;
 
     let index = utils::prompt_select_index(
         env,
@@ -290,17 +296,27 @@ fn display_issue(env: &Env, issue_key: String) -> Result<Value<'_>> {
 
     env.call("insert", &args)?;
 
-    let args = vec![];
+    // create overlay with face "jiroscope-issue-key" for issue key
 
-    env.call("newline", &args)?;
+    let args = vec![0.into_lisp(env)?, (issue_key.len() + 4).into_lisp(env)?];
+
+    let overlay = env.call("make-overlay", &args)?;
+
+    let args = vec![
+        overlay,
+        env.intern("face")?,
+        env.intern("jiroscope-issue-key")?,
+    ];
+
+    env.call("overlay-put", &args)?;
+
+    env.call("newline", [])?;
 
     let args = vec![format!("Summary: {}", issue.fields.summary).into_lisp(env)?];
 
     env.call("insert", &args)?;
 
-    let args = vec![];
-
-    env.call("newline", &args)?;
+    env.call("newline", [])?;
 
     if let Some(description) = issue.fields.description {
         let args = vec![format!("Description: {}", description.to_markdown()).into_lisp(env)?];
