@@ -1,6 +1,7 @@
 use jira::{
     CreatedIssue, IssueCreation, IssueCreationMeta, IssueEdit, IssueEditMeta, IssueEvent,
-    IssueTransition, IssueTransitionDescriptors, Issues, Project, IssueTransitionDescriptor,
+    IssueTransition, IssueTransitionDescriptor, IssueTransitionDescriptors, Issues, Paginated,
+    Project, ProjectCategory, ProjectCreate,
 };
 use serde::Serialize;
 
@@ -15,7 +16,7 @@ pub use error::Error;
 
 pub use ureq;
 
-use crate::jira::Issue;
+use crate::jira::{FieldConfigurationScheme, Issue};
 
 pub struct Jiroscope {
     config: Config,
@@ -184,6 +185,33 @@ impl Jiroscope {
         Ok(())
     }
 
+    pub fn create_project(&mut self, project: ProjectCreate) -> Result<Project, crate::Error> {
+        let name = project.name.clone();
+        let response = self.api_post("project", project)?;
+
+        let mut new_project: Project = response.into_json()?;
+        new_project.name = name; // API doesn't return name
+
+        Ok(new_project)
+    }
+
+    pub fn get_project_categories(&mut self) -> Result<Vec<ProjectCategory>, crate::Error> {
+        let response = self.api_get("projectCategory")?;
+
+        let project_categories: Vec<ProjectCategory> = response.into_json()?;
+
+        Ok(project_categories)
+    }
+
+    pub fn get_field_configuration_schemes(
+        &mut self,
+    ) -> Result<Vec<FieldConfigurationScheme>, crate::Error> {
+        let field_configuration_schemes: Vec<FieldConfigurationScheme> =
+            self.api_get_depaginated("fieldconfigurationscheme")?;
+
+        Ok(field_configuration_schemes)
+    }
+
     fn api_get(&mut self, path: &str) -> Result<ureq::Response, crate::Error> {
         match self
             .auth
@@ -202,6 +230,33 @@ impl Jiroscope {
                 }
             },
         }
+    }
+
+    fn api_get_depaginated<T>(&mut self, path: &str) -> Result<Vec<T>, crate::Error>
+    where
+        for<'a> T: serde::Deserialize<'a>,
+    {
+        let mut results: Vec<T> = Vec::new();
+        let mut start_at = 0;
+        let max_results = 50;
+
+        loop {
+            let response = self.api_get(
+                format!("{}?startAt={}&maxResults={}", path, start_at, max_results).as_str(),
+            )?;
+
+            let paginated: Paginated<T> = response.into_json()?;
+
+            results.extend(paginated.values);
+
+            if paginated.is_last {
+                break;
+            }
+
+            start_at += max_results;
+        }
+
+        Ok(results)
     }
 
     fn api_post(
