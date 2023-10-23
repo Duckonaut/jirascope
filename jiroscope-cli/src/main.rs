@@ -125,9 +125,9 @@ fn main() {
             issue_id,
             summary,
             description,
-            priority,
-            status,
-            assignee,
+            priority: _,
+            status: _,
+            assignee: _,
         } => {
             let mut issue_edit = IssueEdit::default();
 
