@@ -36,6 +36,14 @@
   (interactive)
   (jiroscope-dyn-transition-issue-interactive))
 
+(defun jiroscope-create-project ()
+  (interactive)
+  (jiroscope-dyn-create-project))
+
+(defun jiroscope-delete-project ()
+  (interactive)
+  (jiroscope-dyn-delete-project-interactive))
+
 (defface jiroscope-issue-key
   '((t (:inherit info-title-1)))
   "Face used for issue key headers."

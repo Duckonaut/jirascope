@@ -156,3 +156,13 @@ pub fn prompt_string(env: &Env, prompt: &str) -> Option<String> {
 
     s.filter(|s| !s.is_empty())
 }
+
+pub fn force_prompt_string(env: &Env, prompt: &str) -> emacs::Result<String> {
+    let s = prompt_string(env, prompt);
+
+    if let Some(s) = s {
+        Ok(s)
+    } else {
+        Err(jiroscope_core::Error::jiroscope("Empty string not allowed.").into())
+    }
+}
