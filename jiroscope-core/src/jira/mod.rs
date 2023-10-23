@@ -2,10 +2,12 @@ mod doc;
 mod error;
 mod issue;
 mod project;
+mod user;
 pub use doc::*;
 pub use error::*;
 pub use issue::*;
 pub use project::*;
+pub use user::*;
 
 use serde::{Deserialize, Serialize};
 

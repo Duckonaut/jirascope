@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use ureq::serde_json::Value;
 
-use super::{Project, AtlassianDoc};
+use super::{Project, AtlassianDoc, User};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Issues {
@@ -88,16 +88,6 @@ pub struct Status {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct User {
-    #[serde(rename = "accountId")]
-    pub account_id: String,
-    #[serde(rename = "emailAddress")]
-    pub email_address: String,
-    #[serde(rename = "displayName")]
-    pub display_name: String
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssueEvent {
     pub id: isize,
     pub name: String,
@@ -110,7 +100,7 @@ pub struct IssueCreationMeta {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectIssueCreationMeta {
-    pub id: String,
+    pub id: i64,
     pub key: String,
     pub name: String,
     #[serde(rename = "issuetypes")]

@@ -1,13 +1,14 @@
 use jira::{
     CreatedIssue, IssueCreation, IssueCreationMeta, IssueEdit, IssueEditMeta, IssueEvent,
     IssueTransition, IssueTransitionDescriptor, IssueTransitionDescriptors, Issues, Paginated,
-    Project, ProjectCategory, ProjectCreate,
+    Project, ProjectCategory, ProjectCreate, ProjectCreated, ProjectIssueSecurityScheme, User,
 };
 use serde::Serialize;
 
 mod auth;
 mod config;
 mod error;
+mod utils;
 pub mod jira;
 
 pub use auth::Auth;
@@ -82,6 +83,12 @@ impl Jiroscope {
         let note: Note = response.into_json()?;
 
         Ok(note)
+    }
+
+    pub fn get_users(&mut self) -> Result<Vec<User>, crate::Error> {
+        let users: Vec<User> = self.api_get("users/search")?.into_json()?;
+
+        Ok(users)
     }
 
     pub fn get_projects(&mut self) -> Result<Vec<Project>, crate::Error> {
@@ -185,14 +192,24 @@ impl Jiroscope {
         Ok(())
     }
 
-    pub fn create_project(&mut self, project: ProjectCreate) -> Result<Project, crate::Error> {
-        let name = project.name.clone();
+    pub fn create_project(
+        &mut self,
+        project: ProjectCreate,
+    ) -> Result<ProjectCreated, crate::Error> {
         let response = self.api_post("project", project)?;
 
-        let mut new_project: Project = response.into_json()?;
-        new_project.name = name; // API doesn't return name
+        let new_project: ProjectCreated = response.into_json()?;
 
         Ok(new_project)
+    }
+
+    pub fn delete_project<'a>(
+        &mut self,
+        project_id: impl Into<&'a str>,
+    ) -> Result<(), crate::Error> {
+        self.api_delete(format!("project/{}", project_id.into()).as_str())?;
+
+        Ok(())
     }
 
     pub fn get_project_categories(&mut self) -> Result<Vec<ProjectCategory>, crate::Error> {
@@ -201,6 +218,16 @@ impl Jiroscope {
         let project_categories: Vec<ProjectCategory> = response.into_json()?;
 
         Ok(project_categories)
+    }
+
+    pub fn get_issue_security_schemes(
+        &mut self,
+    ) -> Result<Vec<ProjectIssueSecurityScheme>, crate::Error> {
+        let response = self.api_get("issuesecurityschemes")?;
+
+        let issue_security_schemes: Vec<ProjectIssueSecurityScheme> = response.into_json()?;
+
+        Ok(issue_security_schemes)
     }
 
     pub fn get_field_configuration_schemes(

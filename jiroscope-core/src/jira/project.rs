@@ -2,9 +2,19 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
-    pub id: String,
+    // id is sometimes a string, sometimes a number.
+    // if it's a string, parse to i64,
+    // if it's a number, parse to i64,
+    #[serde(deserialize_with = "crate::utils::deserialize_id")]
+    pub id: i64,
     pub key: String,
     pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectCreated {
+    pub id: i64,
+    pub key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,44 +30,155 @@ pub const PROJECT_TYPE_NAMES_TO_TEMPLATE_RANGE: [(&str, usize, usize); 3] = [
     ("software", 32, 37),
 ];
 
-pub const PROJECT_TEMPLATE_KEYS: [&str; 37] = [
-    "com.atlassian.jira-core-project-templates:jira-core-simplified-content-management",
-    "com.atlassian.jira-core-project-templates:jira-core-simplified-document-approval",
-    "com.atlassian.jira-core-project-templates:jira-core-simplified-lead-tracking",
-    "com.atlassian.jira-core-project-templates:jira-core-simplified-process-control",
-    "com.atlassian.jira-core-project-templates:jira-core-simplified-procurement",
-    "com.atlassian.jira-core-project-templates:jira-core-simplified-project-management",
-    "com.atlassian.jira-core-project-templates:jira-core-simplified-recruitment",
-    "com.atlassian.jira-core-project-templates:jira-core-simplified-task-tracking",
-    "com.atlassian.servicedesk:simplified-it-service-management",
-    "com.atlassian.servicedesk:simplified-general-service-desk-it",
-    "com.atlassian.servicedesk:simplified-general-service-desk-business",
-    "com.atlassian.servicedesk:simplified-external-service-desk",
-    "com.atlassian.servicedesk:simplified-hr-service-desk",
-    "com.atlassian.servicedesk:simplified-facilities-service-desk",
-    "com.atlassian.servicedesk:simplified-legal-service-desk",
-    "com.atlassian.servicedesk:simplified-analytics-service-desk",
-    "com.atlassian.servicedesk:simplified-marketing-service-desk",
-    "com.atlassian.servicedesk:simplified-design-service-desk",
-    "com.atlassian.servicedesk:simplified-sales-service-desk",
-    "com.atlassian.servicedesk:simplified-finance-service-desk",
-    "com.atlassian.servicedesk:next-gen-it-service-desk",
-    "com.atlassian.servicedesk:next-gen-hr-service-desk",
-    "com.atlassian.servicedesk:next-gen-legal-service-desk",
-    "com.atlassian.servicedesk:next-gen-marketing-service-desk",
-    "com.atlassian.servicedesk:next-gen-facilities-service-desk",
-    "com.atlassian.servicedesk:next-gen-general-service-desk",
-    "com.atlassian.servicedesk:next-gen-general-it-service-desk",
-    "com.atlassian.servicedesk:next-gen-general-business-service-desk",
-    "com.atlassian.servicedesk:next-gen-analytics-service-desk",
-    "com.atlassian.servicedesk:next-gen-finance-service-desk",
-    "com.atlassian.servicedesk:next-gen-design-service-desk",
-    "com.atlassian.servicedesk:next-gen-sales-service-desk",
-    "com.pyxis.greenhopper.jira:gh-simplified-agility-kanban",
-    "com.pyxis.greenhopper.jira:gh-simplified-agility-scrum",
-    "com.pyxis.greenhopper.jira:gh-simplified-basic",
-    "com.pyxis.greenhopper.jira:gh-simplified-kanban-classic",
-    "com.pyxis.greenhopper.jira:gh-simplified-scrum-classic",
+pub const PROJECT_TEMPLATES: [ProjectTemplate; 37] = [
+    ProjectTemplate {
+        id: "com.atlassian.jira-core-project-templates:jira-core-simplified-content-management",
+        description: "Simplified content management",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.jira-core-project-templates:jira-core-simplified-document-approval",
+        description: "Simplified document approval",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.jira-core-project-templates:jira-core-simplified-lead-tracking",
+        description: "Simplified lead tracking",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.jira-core-project-templates:jira-core-simplified-process-control",
+        description: "Simplified process control",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.jira-core-project-templates:jira-core-simplified-procurement",
+        description: "Simplified procurement",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.jira-core-project-templates:jira-core-simplified-project-management",
+        description: "Simplified project management",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.jira-core-project-templates:jira-core-simplified-recruitment",
+        description: "Simplified recruitment",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.jira-core-project-templates:jira-core-simplified-task-tracking",
+        description: "Simplified task tracking",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:simplified-it-service-management",
+        description: "Simplified IT service management",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:simplified-general-service-desk-it",
+        description: "Simplified general service desk (IT)",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:simplified-general-service-desk-business",
+        description: "Simplified general service desk (Business)",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:simplified-external-service-desk",
+        description: "Simplified external service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:simplified-hr-service-desk",
+        description: "Simplified HR service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:simplified-facilities-service-desk",
+        description: "Simplified facilities service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:simplified-legal-service-desk",
+        description: "Simplified legal service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:simplified-analytics-service-desk",
+        description: "Simplified analytics service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:simplified-marketing-service-desk",
+        description: "Simplified marketing service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:simplified-design-service-desk",
+        description: "Simplified design service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:simplified-sales-service-desk",
+        description: "Simplified sales service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:simplified-finance-service-desk",
+        description: "Simplified finance service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:next-gen-it-service-desk",
+        description: "Next-gen IT service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:next-gen-hr-service-desk",
+        description: "Next-gen HR service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:next-gen-legal-service-desk",
+        description: "Next-gen legal service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:next-gen-marketing-service-desk",
+        description: "Next-gen marketing service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:next-gen-facilities-service-desk",
+        description: "Next-gen facilities service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:next-gen-general-service-desk",
+        description: "Next-gen general service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:next-gen-general-it-service-desk",
+        description: "Next-gen general service desk (IT)",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:next-gen-general-business-service-desk",
+        description: "Next-gen general service desk (Business)",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:next-gen-analytics-service-desk",
+        description: "Next-gen analytics service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:next-gen-finance-service-desk",
+        description: "Next-gen finance service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:next-gen-design-service-desk",
+        description: "Next-gen design service desk",
+    },
+    ProjectTemplate {
+        id: "com.atlassian.servicedesk:next-gen-sales-service-desk",
+        description: "Next-gen sales service desk",
+    },
+    ProjectTemplate {
+        id: "com.pyxis.greenhopper.jira:gh-simplified-agility-kanban",
+        description: "Agile Kanban",
+    },
+    ProjectTemplate {
+        id: "com.pyxis.greenhopper.jira:gh-simplified-agility-scrum",
+        description: "Agile Scrum",
+    },
+    ProjectTemplate {
+        id: "com.pyxis.greenhopper.jira:gh-simplified-basic",
+        description: "Basic",
+    },
+    ProjectTemplate {
+        id: "com.pyxis.greenhopper.jira:gh-simplified-kanban-classic",
+        description: "Kanban Classic",
+    },
+    ProjectTemplate {
+        id: "com.pyxis.greenhopper.jira:gh-simplified-scrum-classic",
+        description: "Scrum Classic",
+    },
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,23 +186,16 @@ pub struct ProjectCreate {
     pub key: String,
     pub name: String,
     pub description: String,
-    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
     #[serde(rename = "leadAccountId")]
     pub lead_account_id: String,
-    #[serde(rename = "avatarId")]
-    pub avatar_id: i64,
     #[serde(rename = "categoryId")]
-    pub category_id: i64,
+    pub category_id: Option<i64>,
     #[serde(rename = "projectTypeKey")]
     pub project_type_key: String,
     #[serde(rename = "assigneeType")]
     pub assignee_type: AssigneeType,
-    #[serde(rename = "issueSecurityScheme")]
-    pub issue_security_scheme: i64,
-    #[serde(rename = "permissionScheme")]
-    pub permission_scheme: i64,
-    #[serde(rename = "notificationScheme")]
-    pub notification_scheme: i64,
     #[serde(flatten)]
     pub details: ProjectCreateDetails,
 }
@@ -94,6 +208,12 @@ pub enum ProjectCreateDetails {
         project_template_key: String,
     },
     Granular {
+        #[serde(rename = "issueSecurityScheme")]
+        issue_security_scheme: i64,
+        #[serde(rename = "permissionScheme")]
+        permission_scheme: i64,
+        #[serde(rename = "notificationScheme")]
+        notification_scheme: i64,
         #[serde(rename = "issueTypeScheme")]
         issue_type_scheme: i64,
         #[serde(rename = "issueTypeScreenScheme")]
@@ -103,6 +223,12 @@ pub enum ProjectCreateDetails {
         #[serde(rename = "workflowScheme")]
         workflow_scheme: i64,
     },
+}
+
+#[derive(Debug, Clone)]
+pub struct ProjectTemplate {
+    pub id: &'static str,
+    pub description: &'static str,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,14 +241,31 @@ pub enum AssigneeType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectCategory {
-    pub id: String,
+    pub id: i64,
     pub name: String,
     pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldConfigurationScheme {
-    pub id: String,
+    pub id: i64,
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectIssueSecurityScheme {
+    pub id: i64,
+    pub name: String,
+    pub description: String,
+    #[serde(rename = "defaultSecurityLevelId")]
+    pub default_security_level_id: String,
+    pub levels: Vec<ProjectIssueSecurityLevel>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectIssueSecurityLevel {
+    pub id: i64,
     pub name: String,
     pub description: String,
 }
