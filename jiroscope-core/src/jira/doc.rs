@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AtlassianDoc {
     pub version: isize,
     #[serde(rename = "type")]
@@ -8,7 +8,7 @@ pub struct AtlassianDoc {
     pub content: Vec<Content>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Content {
     #[serde(rename = "type")]
     pub type_: String,
@@ -20,7 +20,7 @@ pub struct Content {
     pub marks: Option<Vec<Mark>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Mark {
     #[serde(rename = "type")]
     pub type_: String,
@@ -28,7 +28,7 @@ pub struct Mark {
     pub attrs: Option<MarkAttrs>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MarkAttrs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub href: Option<String>,

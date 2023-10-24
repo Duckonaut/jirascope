@@ -10,14 +10,14 @@ pub struct Issues {
     pub issues: Vec<Issue>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Issue {
     pub id: String,
     pub key: String,
     pub fields: IssueFields,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IssueFields {
     pub summary: String,
     pub description: Option<AtlassianDoc>,
@@ -76,12 +76,12 @@ pub struct IssueEditFields {
     pub assignee: Option<Option<User>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Priority {
     pub name: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Status {
     pub id: String,
     pub name: String,
