@@ -1,6 +1,6 @@
 #![allow(non_snake_case)] // Stops RA from complaining about the Emacs macros.
 
-use std::sync::{Mutex, MutexGuard};
+use std::{sync::{Mutex, MutexGuard}, thread};
 
 use emacs::{defun, Env, IntoLisp, Result, Value};
 use jiroscope_core::{
@@ -18,6 +18,8 @@ mod benchmark;
 mod test_server;
 #[allow(dead_code)]
 mod utils;
+mod concurrent;
+mod state;
 
 // Emacs won't load the module without this.
 emacs::plugin_is_GPL_compatible!();
@@ -35,6 +37,8 @@ fn init(env: &Env) -> Result<()> {
             option_env!("CARGO_PKG_VERSION"),
         ),
     )?;
+
+    concurrent::install_handler(env)?;
     Ok(())
 }
 
@@ -49,6 +53,8 @@ fn setup(url: String, login: String, api_token: String) -> Result<()> {
     unsafe {
         JIROSCOPE = Some(Mutex::new(jiroscope));
     }
+
+    state::setup(60.0);
 
     Ok(())
 }
