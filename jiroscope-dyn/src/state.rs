@@ -1,7 +1,7 @@
 use emacs::defun;
 use jiroscope_core::jira::{Issue, Project};
 
-use crate::get_jiroscope;
+use crate::{concurrent, get_jiroscope};
 
 pub struct State {
     projects: Vec<Project>,
@@ -66,7 +66,10 @@ pub(crate) fn setup(refresh_interval: f64) {
         match state.refresh() {
             Ok(changed) => {
                 if changed {
-                    println!("State refreshed");
+                    concurrent::push_command(Box::new(|env| {
+                        env.call("message", ("Refreshing Jira state...",))
+                            .map(|_| ())
+                    }));
                 }
             }
             Err(err) => eprintln!("Error refreshing state: {}", err),

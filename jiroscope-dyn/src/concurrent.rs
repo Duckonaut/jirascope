@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, sync::RwLock};
 
-use emacs::{defun, Env, Value};
+use emacs::{defun, Env, Value, IntoLisp};
 
 pub(crate) type Command = dyn FnOnce(&Env) -> emacs::Result<()> + Send + 'static;
 
@@ -45,9 +45,10 @@ fn event_handler(env: &Env) -> emacs::Result<()> {
 #[defun]
 pub(crate) fn install_handler(env: &Env) -> emacs::Result<Value<'_>> {
     env.call(
-        "add-hook",
+        "run-with-timer",
         [
-            env.intern("pre-command-hook")?,
+            0.2.into_lisp(env)?,
+            0.2.into_lisp(env)?,
             env.intern("jiroscope-dyn-concurrent-event-handler")?,
         ],
     )
