@@ -1,11 +1,12 @@
 use emacs::defun;
 use jiroscope_core::jira::{Issue, Project};
 
-use crate::{concurrent, get_jiroscope};
+use crate::{concurrent, get_jiroscope, utils, JIROSCOPE_BUFFER_NAME};
 
 pub struct State {
     projects: Vec<Project>,
     issues: Vec<Issue>,
+    dirty: bool,
 }
 
 impl State {
@@ -13,6 +14,7 @@ impl State {
         Self {
             projects: Vec::new(),
             issues: Vec::new(),
+            dirty: false,
         }
     }
 
@@ -24,13 +26,11 @@ impl State {
         &self.issues
     }
 
-    pub fn refresh(&mut self) -> Result<bool, jiroscope_core::Error> {
-        let mut changed = false;
-
+    pub fn refresh(&mut self) -> Result<(), jiroscope_core::Error> {
         let new_projects = get_jiroscope().get_projects()?;
 
         if !new_projects.iter().eq(self.projects.iter()) {
-            changed = true;
+            self.dirty = true;
         }
 
         self.projects = new_projects;
@@ -40,12 +40,12 @@ impl State {
             .map(|issues| issues.issues)?;
 
         if !new_issues.iter().eq(self.issues.iter()) {
-            changed = true;
+            self.dirty = true;
         }
 
         self.issues = new_issues;
 
-        Ok(changed)
+        Ok(())
     }
 }
 
@@ -64,12 +64,17 @@ pub(crate) fn setup(refresh_interval: f64) {
     let refresh_interval = std::time::Duration::from_secs_f64(refresh_interval);
     std::thread::spawn(move || loop {
         match state.refresh() {
-            Ok(changed) => {
-                if changed {
-                    concurrent::push_command(Box::new(|env| {
-                        env.call("message", ("Refreshing Jira state...",))
-                            .map(|_| ())
-                    }));
+            Ok(_) => {
+                if state.dirty {
+                    if let Some(utils::JiroscopeBufferMode::Tree) = utils::get_buffer_mode() {
+                        concurrent::push_command(Box::new(|env| {
+                            utils::with_buffer(env, JIROSCOPE_BUFFER_NAME, |env| {
+                                env.call("erase-buffer", [])?;
+
+                                print_tree(env, get_state())
+                            })
+                        }));
+                    }
                 }
             }
             Err(err) => eprintln!("Error refreshing state: {}", err),
@@ -79,10 +84,50 @@ pub(crate) fn setup(refresh_interval: f64) {
 }
 
 #[defun]
-fn print() -> emacs::Result<()> {
+fn open(env: &emacs::Env) -> emacs::Result<()> {
     let state = get_state();
-    println!("Projects: {:?}", state.projects());
-    println!("Issues: {:?}", state.issues());
+
+    utils::set_buffer_mode(utils::JiroscopeBufferMode::Tree);
+    utils::open_jiroscope_buffer(env)?;
+
+    env.call("erase-buffer", [])?;
+
+    print_tree(env, state)?;
+
+    Ok(())
+}
+
+fn get_icon(i: usize, len: usize) -> &'static str {
+    if i == len - 1 {
+        "└"
+    } else {
+        "├"
+    }
+}
+
+fn print_tree(env: &emacs::Env, state: &State) -> emacs::Result<()> {
+    for project in state.projects() {
+        env.call("insert", (format!("{}: {}\n", project.key, project.name),))?;
+
+        let issues = state
+            .issues()
+            .iter()
+            .filter(|i| i.fields.project.key == project.key);
+
+        let size = issues.size_hint().0;
+        for (i, issue) in issues.enumerate() {
+            env.call(
+                "insert",
+                (format!(
+                    "{} {}: {} - {}\n",
+                    get_icon(i, size),
+                    issue.key,
+                    issue.fields.summary,
+                    issue.fields.status.name
+                ),),
+            )?;
+        }
+    }
 
     Ok(())
 }

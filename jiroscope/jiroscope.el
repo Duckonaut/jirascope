@@ -16,33 +16,37 @@
   (jiroscope-dyn-setup url login api_token))
 
 ;; add bindings for interactive use
-(defun jiroscope-delete-issue ()
+(defun issue-jiroscope-create ()
   (interactive)
-  (jiroscope-dyn-delete-issue-interactive))
+  (jiroscope-issue-dyn-create))
 
-(defun jiroscope-display-issue ()
+(defun jiroscope-issue-display ()
   (interactive)
-  (jiroscope-dyn-display-issue-interactive))
+  (jiroscope-dyn-issue-display-interactive))
 
-(defun jiroscope-create-issue ()
+(defun jiroscope-issue-edit ()
   (interactive)
-  (jiroscope-dyn-create-issue))
+  (jiroscope-dyn-issue-edit))
 
-(defun jiroscope-edit-issue ()
+(defun jiroscope-issue-delete ()
   (interactive)
-  (jiroscope-dyn-edit-issue))
+  (jiroscope-dyn-issue-delete-interactive))
 
-(defun jiroscope-transition-issue ()
+(defun jiroscope-issue-transition ()
   (interactive)
-  (jiroscope-dyn-transition-issue-interactive))
+  (jiroscope-dyn-issue-transition-interactive))
 
-(defun jiroscope-create-project ()
+(defun jiroscope-project-create ()
   (interactive)
-  (jiroscope-dyn-create-project))
+  (jiroscope-dyn-project-create))
 
-(defun jiroscope-delete-project ()
+(defun jiroscope-project-delete ()
   (interactive)
-  (jiroscope-dyn-delete-project-interactive))
+  (jiroscope-dyn-project-delete-interactive))
+
+(defun jiroscope-tree-open()
+  (interactive)
+  (jiroscope-dyn-state-open))
 
 (defface jiroscope-issue-key
   '((t (:inherit info-title-1)))

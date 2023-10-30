@@ -1,6 +1,12 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Mutex};
 
-use emacs::{Env, IntoLisp};
+use emacs::{Env, IntoLisp, Result, Value};
+
+use crate::JIROSCOPE_BUFFER_NAME;
+
+pub fn nil(env: &Env) -> Result<Value<'_>> {
+    ().into_lisp(env)
+}
 
 pub fn dump_string_to_buffer(env: &Env, buffer_name: &str, string: &str) {
     let args = vec![buffer_name.to_string().into_lisp(env).unwrap()];
@@ -165,4 +171,75 @@ pub fn force_prompt_string(env: &Env, prompt: &str) -> emacs::Result<String> {
     } else {
         Err(jiroscope_core::Error::jiroscope("Empty string not allowed.").into())
     }
+}
+
+pub fn get_current_buffer_name(env: &Env) -> Result<String> {
+    let buffer = env.call("current-buffer", [])?;
+    let name = env.call("buffer-name", [buffer])?;
+    name.into_rust()
+}
+
+pub fn goto_buffer(env: &Env, buffer_name: &str) -> Result<()> {
+    let args = vec![buffer_name.to_string().into_lisp(env)?];
+    let buffer = env.call("get-buffer", &args)?;
+    let args = vec![buffer];
+    env.call("switch-to-buffer", &args)?;
+    Ok(())
+}
+
+pub fn open_jiroscope_buffer(env: &Env) -> Result<()> {
+    let args = vec![JIROSCOPE_BUFFER_NAME.to_string().into_lisp(env)?];
+
+    let buffer = env.call("get-buffer-create", &args)?;
+
+    let args = vec![buffer];
+
+    env.call("switch-to-buffer", &args)?;
+
+    env.call("erase-buffer", [])?;
+
+    Ok(())
+}
+
+pub fn clear_jiroscope_buffer(env: &Env) -> Result<()> {
+    let args = vec![JIROSCOPE_BUFFER_NAME.to_string().into_lisp(env)?];
+
+    let buffer = env.call("get-buffer-create", &args)?;
+
+    let args = vec![buffer];
+
+    env.call("erase-buffer", &args)?;
+
+    Ok(())
+}
+
+pub fn with_buffer<T, F: FnOnce(&Env) -> Result<T>>(
+    env: &Env,
+    buffer_name: &str,
+    f: F,
+) -> Result<T> {
+    let args = vec![buffer_name.to_string().into_lisp(env)?];
+    let buffer = env.call("get-buffer-create", &args)?;
+    let args = vec![buffer.into_lisp(env)?];
+    env.call("set-buffer", &args)?;
+    f(env)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JiroscopeBufferMode {
+    Issue,
+    Project,
+    Tree,
+}
+
+static JIROSCOPE_BUFFER_MODE: Mutex<JiroscopeBufferMode> = Mutex::new(JiroscopeBufferMode::Issue);
+
+pub fn set_buffer_mode(mode: JiroscopeBufferMode) {
+    let mut buffer_mode = JIROSCOPE_BUFFER_MODE.lock().unwrap();
+    *buffer_mode = mode;
+}
+
+pub fn get_buffer_mode() -> Option<JiroscopeBufferMode> {
+    let buffer_mode = JIROSCOPE_BUFFER_MODE.lock().unwrap();
+    Some(*buffer_mode)
 }
