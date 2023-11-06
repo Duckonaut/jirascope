@@ -1,42 +1,21 @@
+use std::thread;
+
 use emacs::{defun, Env, IntoLisp, Result, Value};
 use jiroscope_core::jira::{
     AtlassianDoc, Issue, IssueCreation, IssueCreationFields, IssueEdit, IssueTransitionDescriptor,
-    Issues, Project,
 };
 
 use crate::{
-    get_jiroscope,
+    concurrent, get_jiroscope,
+    state::{self, get_state},
     utils::{self, open_jiroscope_buffer},
 };
 
-#[defun(user_ptr)]
-fn get(_: &Env, issue_key: String) -> Result<Issue> {
-    let issue = get_jiroscope().get_issue(&*issue_key)?;
-
-    Ok(issue)
-}
-
-#[defun(user_ptr)]
-fn get_all(_: &Env) -> Result<Issues> {
-    let issues = get_jiroscope().get_all_issues()?;
-
-    Ok(issues)
-}
-
 #[defun]
-fn get_key<'e>(env: &'e Env, issue: &mut Issue) -> Result<Value<'e>> {
-    issue.key.clone().into_lisp(env)
-}
-
-#[defun]
-fn get_summary<'e>(env: &'e Env, issue: &mut Issue) -> Result<Value<'e>> {
-    issue.fields.summary.clone().into_lisp(env)
-}
-
-#[defun]
-fn create(env: &Env) -> Result<Value<'_>> {
+fn create_interactive(env: &Env) -> Result<Value<'_>> {
     let mut jiroscope = get_jiroscope();
-    let mut projects: Vec<Project> = jiroscope.get_projects()?;
+    let state = get_state();
+    let projects = state.projects();
 
     // let user choose project
     let index = utils::prompt_select_index(
@@ -53,7 +32,7 @@ fn create(env: &Env) -> Result<Value<'_>> {
         return utils::nil(env);
     }
 
-    let project = projects.remove(index.unwrap());
+    let project = projects[index.unwrap()].clone();
 
     // let user choose issue type
     let create_meta = jiroscope.get_issue_creation_meta()?;
@@ -103,19 +82,33 @@ fn create(env: &Env) -> Result<Value<'_>> {
         },
     };
 
-    let issue = jiroscope.create_issue(issue_creation)?;
+    thread::spawn(move || {
+        let result = get_jiroscope().create_issue(issue_creation);
 
-    let args = vec![format!("Created issue {}.", issue.key).into_lisp(env)?];
+        if result.is_ok() {
+            concurrent::push_command(Box::new(|env| {
+                state::refresh(env)?;
 
-    env.call("message", &args)?;
+                env.call("message", ["Created issue.".into_lisp(env)?])?;
+
+                Ok(())
+            }));
+        } else {
+            concurrent::push_command(Box::new(|env| {
+                env.call("message", ["Failed to create issue.".into_lisp(env)?])?;
+
+                Ok(())
+            }));
+        }
+    });
 
     utils::nil(env)
 }
 
 fn prompt_issue(env: &Env) -> Option<Issue> {
-    let mut jiroscope = get_jiroscope();
     // let user choose issue
-    let mut issues = jiroscope.get_all_issues().unwrap().issues;
+    let state = get_state();
+    let issues = state.issues();
 
     let index = utils::prompt_select_index(
         env,
@@ -127,7 +120,7 @@ fn prompt_issue(env: &Env) -> Option<Issue> {
             .as_slice(),
     )?;
 
-    Some(issues.remove(index))
+    Some(issues[index].clone())
 }
 
 fn prompt_issue_transition(env: &Env, issue_key: &str) -> Option<IssueTransitionDescriptor> {
@@ -178,18 +171,25 @@ fn edit_interactive(env: &Env) -> Result<Value<'_>> {
     )
     .map(|d| AtlassianDoc::from_markdown(&d));
 
-    get_jiroscope().edit_issue(&*issue.key, issue_edit)?;
+    thread::spawn(move || {
+        let result = get_jiroscope().edit_issue(&*issue.key, issue_edit);
 
-    let args = vec![format!("Created issue {}.", issue.key).into_lisp(env)?];
+        if result.is_ok() {
+            concurrent::push_command(Box::new(|env| {
+                state::refresh(env)?;
 
-    env.call("message", &args)?;
+                env.call("message", ["Edited issue.".into_lisp(env)?])?;
 
-    utils::nil(env)
-}
+                Ok(())
+            }));
+        } else {
+            concurrent::push_command(Box::new(|env| {
+                env.call("message", ["Failed to edit issue.".into_lisp(env)?])?;
 
-#[defun]
-fn delete(env: &Env, issue_key: String) -> Result<Value<'_>> {
-    get_jiroscope().delete_issue(&*issue_key)?;
+                Ok(())
+            }));
+        }
+    });
 
     utils::nil(env)
 }
@@ -203,12 +203,29 @@ fn delete_interactive(env: &Env) -> Result<Value<'_>> {
     }
 
     let issue = issue.unwrap();
+    let issue_key = issue.key;
 
-    get_jiroscope().delete_issue(&*issue.key)?;
+    thread::spawn(move || {
+        let result = get_jiroscope().delete_issue(&*issue_key);
+        if result.is_ok() {
+            concurrent::push_command(Box::new(move |env| {
+                state::refresh(env)?;
 
-    let args = vec![format!("Deleted issue {}.", issue.key).into_lisp(env)?];
+                env.call(
+                    "message",
+                    [format!("Deleted issue {}.", issue_key).into_lisp(env)?],
+                )?;
 
-    env.call("message", &args)?;
+                Ok(())
+            }));
+        } else {
+            concurrent::push_command(Box::new(|env| {
+                env.call("message", ["Failed to delete issue.".into_lisp(env)?])?;
+
+                Ok(())
+            }));
+        }
+    });
 
     utils::nil(env)
 }
@@ -222,8 +239,9 @@ fn transition_interactive(env: &Env) -> Result<Value<'_>> {
     }
 
     let issue = issue.unwrap();
+    let issue_key = issue.key;
 
-    let transition = prompt_issue_transition(env, &issue.key);
+    let transition = prompt_issue_transition(env, &issue_key);
 
     if transition.is_none() {
         return utils::nil(env);
@@ -231,11 +249,28 @@ fn transition_interactive(env: &Env) -> Result<Value<'_>> {
 
     let transition = transition.unwrap();
 
-    get_jiroscope().transition_issue(issue.key.as_str(), transition)?;
+    thread::spawn(move || {
+        let result = get_jiroscope().transition_issue(issue_key.as_str(), transition);
 
-    let args = vec![format!("Transitioned issue {}.", issue.key).into_lisp(env)?];
+        if result.is_ok() {
+            concurrent::push_command(Box::new(move |env| {
+                state::refresh(env)?;
 
-    env.call("message", &args)?;
+                env.call(
+                    "message",
+                    [format!("Transitioned issue {}.", issue_key).into_lisp(env)?],
+                )?;
+
+                Ok(())
+            }));
+        } else {
+            concurrent::push_command(Box::new(|env| {
+                env.call("message", ["Failed to transition issue.".into_lisp(env)?])?;
+
+                Ok(())
+            }));
+        }
+    });
 
     utils::nil(env)
 }

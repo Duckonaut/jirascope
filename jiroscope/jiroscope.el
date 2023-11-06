@@ -16,9 +16,9 @@
   (jiroscope-dyn-setup url login api_token))
 
 ;; add bindings for interactive use
-(defun issue-jiroscope-create ()
+(defun jiroscope-issue-create ()
   (interactive)
-  (jiroscope-issue-dyn-create))
+  (jiroscope-dyn-issue-create-interactive))
 
 (defun jiroscope-issue-display ()
   (interactive)
@@ -26,7 +26,7 @@
 
 (defun jiroscope-issue-edit ()
   (interactive)
-  (jiroscope-dyn-issue-edit))
+  (jiroscope-dyn-issue-edit-interactive))
 
 (defun jiroscope-issue-delete ()
   (interactive)
@@ -38,7 +38,7 @@
 
 (defun jiroscope-project-create ()
   (interactive)
-  (jiroscope-dyn-project-create))
+  (jiroscope-dyn-project-create-interactive))
 
 (defun jiroscope-project-delete ()
   (interactive)

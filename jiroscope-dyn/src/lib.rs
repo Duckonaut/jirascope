@@ -1,6 +1,6 @@
 #![allow(non_snake_case)] // Stops RA from complaining about the Emacs macros.
 
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use emacs::{defun, Env, Result};
 use jiroscope_core::{Auth, Config, Jiroscope};
@@ -19,7 +19,7 @@ mod utils;
 // Emacs won't load the module without this.
 emacs::plugin_is_GPL_compatible!();
 
-static mut JIROSCOPE: Option<Mutex<Jiroscope>> = None;
+static JIROSCOPE: OnceLock<Mutex<Jiroscope>> = OnceLock::new();
 static JIROSCOPE_BUFFER_NAME: &str = "*jiroscope*";
 
 // Register the initialization hook that Emacs will call when it loads the module.
@@ -45,15 +45,23 @@ fn setup(url: String, login: String, api_token: String) -> Result<()> {
     let mut jiroscope = Jiroscope::new(config, auth);
     jiroscope.init()?;
 
-    unsafe {
-        JIROSCOPE = Some(Mutex::new(jiroscope));
+    let res = JIROSCOPE.set(Mutex::new(jiroscope));
+
+    if res.is_err() {
+        panic!("Jiroscope already initialized.");
     }
 
-    state::setup(60.0);
+    state::setup(30.0);
 
     Ok(())
 }
 
 fn get_jiroscope<'a>() -> MutexGuard<'a, Jiroscope> {
-    unsafe { JIROSCOPE.as_ref().unwrap() }.lock().unwrap()
+    let j = JIROSCOPE
+        .get_or_init(|| {
+            panic!("Jiroscope not initialized. Call `jiroscope-dyn--setup` first.");
+        })
+        .lock()
+        .unwrap();
+    j
 }

@@ -1,6 +1,6 @@
 build:
-    cargo build --release
-    cp target/release/libjiroscope_dyn.so jiroscope/jiroscope-dyn.so
+    cargo build
+    cp target/debug/libjiroscope_dyn.so jiroscope/jiroscope-dyn.so
 
 testing:
     cargo build --features full

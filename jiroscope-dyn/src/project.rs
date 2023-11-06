@@ -1,10 +1,15 @@
-use emacs::{defun, Env, Result, Value, IntoLisp};
-use jiroscope_core::jira::{PROJECT_TYPE_KEYS, PROJECT_TEMPLATES, PROJECT_TYPE_NAMES_TO_TEMPLATE_RANGE, ProjectCreateDetails, ProjectCreate};
+use std::thread;
 
-use crate::{get_jiroscope, utils};
+use emacs::{defun, Env, IntoLisp, Result, Value};
+use jiroscope_core::jira::{
+    ProjectCreate, ProjectCreateDetails, PROJECT_TEMPLATES, PROJECT_TYPE_KEYS,
+    PROJECT_TYPE_NAMES_TO_TEMPLATE_RANGE,
+};
+
+use crate::{concurrent, get_jiroscope, state, utils};
 
 #[defun]
-fn create_project(env: &Env) -> Result<Value<'_>> {
+fn create_interactive(env: &Env) -> Result<Value<'_>> {
     let mut jiroscope = get_jiroscope();
     let key = utils::force_prompt_string(env, "Enter project key: ")?;
     let name = utils::force_prompt_string(env, "Enter project name: ")?;
@@ -92,7 +97,8 @@ fn create_project(env: &Env) -> Result<Value<'_>> {
         env,
         "Choose project template: ",
         PROJECT_TEMPLATES[template_range.1..template_range.2]
-            .iter() .map(|c| c.description)
+            .iter()
+            .map(|c| c.description)
             .collect::<Vec<_>>()
             .as_slice(),
     );
@@ -105,7 +111,7 @@ fn create_project(env: &Env) -> Result<Value<'_>> {
         .id
         .to_string();
 
-    let project = jiroscope.create_project(ProjectCreate {
+    let project_create = ProjectCreate {
         key,
         name,
         description,
@@ -117,22 +123,27 @@ fn create_project(env: &Env) -> Result<Value<'_>> {
         details: ProjectCreateDetails::Template {
             project_template_key: template,
         },
-    })?;
+    };
 
-    let args = vec![format!("Created project {}.", project.key).into_lisp(env)?];
+    thread::spawn(move || {
+        let result = get_jiroscope().create_project(project_create);
 
-    env.call("message", &args)?;
+        if result.is_ok() {
+            concurrent::push_command(Box::new(|env| {
+                state::refresh(env)?;
 
-    utils::nil(env)
-}
+                env.call("message", ["Project created successfully.".into_lisp(env)?])?;
 
-#[defun]
-fn delete_project(env: &Env, project_key: String) -> Result<Value<'_>> {
-    get_jiroscope().delete_project(&*project_key)?;
+                Ok(())
+            }));
+        } else {
+            concurrent::push_command(Box::new(|env| {
+                env.call("message", ["Failed to create project.".into_lisp(env)?])?;
 
-    let args = vec![format!("Deleted project {}.", project_key).into_lisp(env)?];
-
-    env.call("message", &args)?;
+                Ok(())
+            }));
+        }
+    });
 
     utils::nil(env)
 }
@@ -155,10 +166,30 @@ fn delete_project_interactive(env: &Env) -> Result<Value<'_>> {
         return utils::nil(env);
     }
 
-    let project = projects[index.unwrap()].key.clone();
+    let project_key = projects[index.unwrap()].key.clone();
 
-    delete_project(env, project)?;
+    thread::spawn(move || {
+        let result = get_jiroscope().delete_project(&*project_key);
+
+        if result.is_ok() {
+            concurrent::push_command(Box::new(move |env| {
+                state::refresh(env)?;
+
+                env.call(
+                    "message",
+                    [format!("Deleted project {}.", project_key).into_lisp(env)?],
+                )?;
+
+                Ok(())
+            }));
+        } else {
+            concurrent::push_command(Box::new(|env| {
+                env.call("message", ["Failed to delete project.".into_lisp(env)?])?;
+
+                Ok(())
+            }));
+        }
+    });
 
     utils::nil(env)
 }
-
