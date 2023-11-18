@@ -28,6 +28,14 @@
   (interactive)
   (jiroscope-dyn-issue-edit-interactive))
 
+(defun jiroscope-issue-edit-graphical ()
+  (interactive)
+  (jiroscope-dyn-issue-edit-graphical-interactive))
+
+(defun jiroscope-issue-edit-finish ()
+  (interactive)
+  (jiroscope-dyn-issue-edit-graphical-finish))
+
 (defun jiroscope-issue-delete ()
   (interactive)
   (jiroscope-dyn-issue-delete-interactive))
@@ -52,5 +60,13 @@
   '((t (:inherit info-title-1)))
   "Face used for issue key headers."
   :group 'jiroscope)
+
+(define-button-type 'jiroscope-issue-button
+    'follow-link t
+    'action 'jiroscope-dyn-issue-button-action)
+
+(defun jiroscope-insert-button (text ty)
+  (insert-button text
+    :type 'jiroscope-issue-button))
 
 (provide 'jiroscope)

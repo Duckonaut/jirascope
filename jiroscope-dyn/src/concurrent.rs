@@ -1,6 +1,9 @@
-use std::{collections::VecDeque, sync::RwLock};
+use std::{
+    collections::VecDeque,
+    sync::{atomic::AtomicUsize, RwLock},
+};
 
-use emacs::{defun, Env, Value, IntoLisp};
+use emacs::{defun, Env, IntoLisp, Value};
 
 pub(crate) type Command = dyn FnOnce(&Env) -> emacs::Result<()> + Send + 'static;
 
@@ -18,19 +21,39 @@ impl CommandEntry {
     }
 }
 
-static mut COMMAND_QUEUE: RwLock<VecDeque<CommandEntry>> = RwLock::new(VecDeque::new());
+// This is a bit of a hack. We have two queues, and we swap between them. This
+// lets us push further async commands while we're running the current queue.
+static mut COMMAND_QUEUE_A: RwLock<VecDeque<CommandEntry>> = RwLock::new(VecDeque::new());
+static mut COMMAND_QUEUE_B: RwLock<VecDeque<CommandEntry>> = RwLock::new(VecDeque::new());
+static COMMAND_QUEUE_INDEX: AtomicUsize = AtomicUsize::new(0);
 
-pub(crate) fn push_command(callback: Box<Command>) {
+fn swap_command_queues() {
+    COMMAND_QUEUE_INDEX.store(
+        1 - COMMAND_QUEUE_INDEX.load(std::sync::atomic::Ordering::Relaxed),
+        std::sync::atomic::Ordering::Relaxed,
+    );
+}
+
+fn current_command_queue() -> &'static RwLock<VecDeque<CommandEntry>> {
     unsafe {
-        COMMAND_QUEUE
-            .write()
-            .unwrap()
-            .push_back(CommandEntry::new(callback));
+        if COMMAND_QUEUE_INDEX.load(std::sync::atomic::Ordering::Relaxed) == 0 {
+            &COMMAND_QUEUE_A
+        } else {
+            &COMMAND_QUEUE_B
+        }
     }
 }
 
+pub(crate) fn push_command(callback: Box<Command>) {
+    current_command_queue()
+        .write()
+        .unwrap()
+        .push_back(CommandEntry::new(callback));
+}
+
 pub(crate) fn flush_commands(env: &Env) -> emacs::Result<()> {
-    let mut queue = unsafe { COMMAND_QUEUE.write().unwrap() };
+    let mut queue = current_command_queue().write().unwrap();
+    swap_command_queues();
     while let Some(entry) = queue.pop_front() {
         entry.run(env)?;
     }

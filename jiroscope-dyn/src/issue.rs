@@ -8,8 +8,51 @@ use jiroscope_core::jira::{
 use crate::{
     concurrent, get_jiroscope,
     state::{self, get_state},
-    utils::{self, open_jiroscope_buffer},
+    utils::{
+        self, current_buffer_face_println, current_buffer_println, get_jiroscope_buffer_content,
+        open_jiroscope_buffer, prompt_force_change, signal_result, signal_result_async,
+        ScopeCleaner,
+    },
 };
+
+fn prompt_issue(env: &Env) -> Option<Issue> {
+    // let user choose issue
+    let state = get_state();
+    let issues = state.issues();
+
+    let index = utils::prompt_select_index(
+        env,
+        "Choose issue: ",
+        issues
+            .iter()
+            .map(|t| t.key.clone())
+            .collect::<Vec<_>>()
+            .as_slice(),
+    )?;
+
+    Some(issues[index].clone())
+}
+
+fn prompt_issue_transition(env: &Env, issue_key: &str) -> Option<IssueTransitionDescriptor> {
+    let mut jiroscope = get_jiroscope();
+    // let user choose issue status
+    let mut issue_transitions = jiroscope
+        .get_issue_transitions(issue_key)
+        .unwrap()
+        .transitions;
+
+    let index = utils::prompt_select_index(
+        env,
+        "Choose issue status: ",
+        issue_transitions
+            .iter()
+            .map(|t| t.name.clone())
+            .collect::<Vec<_>>()
+            .as_slice(),
+    )?;
+
+    Some(issue_transitions.remove(index))
+}
 
 #[defun]
 fn create_interactive(env: &Env) -> Result<Value<'_>> {
@@ -66,17 +109,19 @@ fn create_interactive(env: &Env) -> Result<Value<'_>> {
         return utils::nil(env);
     }
 
-    // let user enter description
-    let description = utils::prompt_string(env, "Enter issue description (or leave empty): ");
+    let summary = summary.unwrap();
 
-    let description = description.filter(|d| !d.is_empty());
+    // let user enter description
+    let description = utils::prompt_string(env, "Enter issue description (or leave empty): ")
+        .filter(|d| !d.is_empty())
+        .map(|d| AtlassianDoc::from_markdown(&d));
 
     let issue_creation = IssueCreation {
         fields: IssueCreationFields {
             project,
             issue_type,
-            summary: summary.unwrap(),
-            description: description.map(|d| AtlassianDoc::from_markdown(&d)),
+            summary,
+            description,
             priority: None,
             assignee: None,
         },
@@ -105,45 +150,6 @@ fn create_interactive(env: &Env) -> Result<Value<'_>> {
     utils::nil(env)
 }
 
-fn prompt_issue(env: &Env) -> Option<Issue> {
-    // let user choose issue
-    let state = get_state();
-    let issues = state.issues();
-
-    let index = utils::prompt_select_index(
-        env,
-        "Choose issue: ",
-        issues
-            .iter()
-            .map(|t| t.key.clone())
-            .collect::<Vec<_>>()
-            .as_slice(),
-    )?;
-
-    Some(issues[index].clone())
-}
-
-fn prompt_issue_transition(env: &Env, issue_key: &str) -> Option<IssueTransitionDescriptor> {
-    let mut jiroscope = get_jiroscope();
-    // let user choose issue status
-    let mut issue_transitions = jiroscope
-        .get_issue_transitions(issue_key)
-        .unwrap()
-        .transitions;
-
-    let index = utils::prompt_select_index(
-        env,
-        "Choose issue status: ",
-        issue_transitions
-            .iter()
-            .map(|t| t.name.clone())
-            .collect::<Vec<_>>()
-            .as_slice(),
-    )?;
-
-    Some(issue_transitions.remove(index))
-}
-
 #[defun]
 fn edit_interactive(env: &Env) -> Result<Value<'_>> {
     let issue = prompt_issue(env);
@@ -153,6 +159,11 @@ fn edit_interactive(env: &Env) -> Result<Value<'_>> {
     }
 
     let issue = issue.unwrap();
+
+    get_state().check_out_issue(issue.key.clone())?;
+    // in case something fails, we want to make sure the issue is returned
+    // to not lock it forever
+    let guard = ScopeCleaner::new(|| get_state().return_issue());
 
     let mut issue_edit = IssueEdit::default();
 
@@ -172,23 +183,146 @@ fn edit_interactive(env: &Env) -> Result<Value<'_>> {
     .map(|d| AtlassianDoc::from_markdown(&d));
 
     thread::spawn(move || {
+        if !get_state().try_return_issue(&*issue.key) {
+            concurrent::push_command(Box::new(move |env| {
+                env.call(
+                    "message",
+                    ["Issue changed since last access.".into_lisp(env)?],
+                )?;
+
+                if prompt_force_change(env, "Issue changed since last access")? {
+                    let result = get_jiroscope().edit_issue(&*issue.key, issue_edit);
+
+                    signal_result(env, result, "Issue edited.", "Failed to edit issue.")?;
+                }
+
+                Ok(())
+            }));
+            return;
+        }
+
         let result = get_jiroscope().edit_issue(&*issue.key, issue_edit);
 
-        if result.is_ok() {
-            concurrent::push_command(Box::new(|env| {
-                state::refresh(env)?;
+        signal_result_async(result, "Issue edited.", "Failed to edit issue.");
+        // make sure the guard is moved into the closure
+        drop(guard);
+    });
 
-                env.call("message", ["Edited issue.".into_lisp(env)?])?;
+    utils::nil(env)
+}
+
+#[defun]
+fn button_action(env: &Env, button: Value<'_>) -> Result<()> {
+    let button_content = env.call("button-label", [button])?.into_rust::<String>()?;
+
+    edit_graphical(env, button_content)
+}
+
+#[defun]
+fn edit_graphical_interactive(env: &Env) -> Result<()> {
+    let issue = prompt_issue(env);
+
+    if issue.is_none() {
+        return Ok(());
+    }
+
+    edit_graphical(env, issue.unwrap().key)
+}
+
+fn edit_graphical(env: &Env, issue_key: String) -> Result<()> {
+    let issue = get_state().get_issue(&issue_key);
+
+    if issue.is_none() {
+        return Ok(());
+    }
+
+    let issue = issue.unwrap();
+
+    get_state().return_issue();
+    get_state().check_out_issue(issue.key.clone())?;
+
+    open_jiroscope_buffer(env)?;
+
+    current_buffer_face_println(env, &format!("* {} *", issue_key), "jiroscope-issue-key")?;
+
+    current_buffer_println(env, &format!("Summary: {}", issue.fields.summary))?;
+
+    current_buffer_println(env, &format!("Status: {}", issue.fields.status.name))?;
+
+    if let Some(description) = issue.fields.description {
+        current_buffer_println(env, &format!("Description: {}", description.to_markdown()))?;
+    }
+
+    utils::set_buffer_mode(env, utils::JiroscopeBufferMode::IssueEdit)?;
+
+    Ok(())
+}
+
+#[defun]
+fn edit_graphical_finish(env: &Env) -> Result<Value<'_>> {
+    let mut issue_edit = IssueEdit::default();
+
+    let edited_issue = get_jiroscope_buffer_content(env)?;
+
+    // parse out issue edit
+    let key = edited_issue
+        .lines()
+        .next()
+        .unwrap()
+        .trim_start_matches("* ")
+        .trim_end_matches(" *")
+        .to_string();
+
+    issue_edit.fields.summary = edited_issue
+        .lines()
+        .find(|l| l.starts_with("Summary: "))
+        .map(|l| l.trim_start_matches("Summary: ").to_string());
+
+    let description_str = &edited_issue[edited_issue
+        .find("Description: ")
+        .map(|i| i + "Description: ".len())
+        .unwrap_or(0)..];
+
+    issue_edit.fields.description = if description_str.is_empty() {
+        None
+    } else {
+        Some(AtlassianDoc::from_markdown(description_str))
+    };
+
+    thread::spawn(move || {
+        if !get_state().try_return_issue(&*key) {
+            concurrent::push_command(Box::new(move |env| {
+                env.call(
+                    "message",
+                    ["Issue changed since last access.".into_lisp(env)?],
+                )?;
+
+                if prompt_force_change(env, "Issue changed since last access")? {
+                    let result = get_jiroscope().edit_issue(&*key, issue_edit);
+
+                    state::get_state().return_issue();
+
+                    signal_result(env, result, "Issue edited.", "Failed to edit issue.")?;
+
+                    state::get_state().check_out_issue(key.clone())?;
+                }
 
                 Ok(())
             }));
-        } else {
-            concurrent::push_command(Box::new(|env| {
-                env.call("message", ["Failed to edit issue.".into_lisp(env)?])?;
-
-                Ok(())
-            }));
+            return;
         }
+
+        let result = get_jiroscope().edit_issue(&*key, issue_edit);
+
+        state::get_state().return_issue();
+
+        signal_result_async(result, "Issue edited.", "Failed to edit issue.");
+
+        concurrent::push_command(Box::new(move |env| {
+            state::open(env)?;
+
+            Ok(())
+        }));
     });
 
     utils::nil(env)
@@ -207,24 +341,7 @@ fn delete_interactive(env: &Env) -> Result<Value<'_>> {
 
     thread::spawn(move || {
         let result = get_jiroscope().delete_issue(&*issue_key);
-        if result.is_ok() {
-            concurrent::push_command(Box::new(move |env| {
-                state::refresh(env)?;
-
-                env.call(
-                    "message",
-                    [format!("Deleted issue {}.", issue_key).into_lisp(env)?],
-                )?;
-
-                Ok(())
-            }));
-        } else {
-            concurrent::push_command(Box::new(|env| {
-                env.call("message", ["Failed to delete issue.".into_lisp(env)?])?;
-
-                Ok(())
-            }));
-        }
+        signal_result_async(result, "Issue deleted.", "Failed to delete issue.");
     });
 
     utils::nil(env)
@@ -252,24 +369,7 @@ fn transition_interactive(env: &Env) -> Result<Value<'_>> {
     thread::spawn(move || {
         let result = get_jiroscope().transition_issue(issue_key.as_str(), transition);
 
-        if result.is_ok() {
-            concurrent::push_command(Box::new(move |env| {
-                state::refresh(env)?;
-
-                env.call(
-                    "message",
-                    [format!("Transitioned issue {}.", issue_key).into_lisp(env)?],
-                )?;
-
-                Ok(())
-            }));
-        } else {
-            concurrent::push_command(Box::new(|env| {
-                env.call("message", ["Failed to transition issue.".into_lisp(env)?])?;
-
-                Ok(())
-            }));
-        }
+        signal_result_async(result, "Transitioned issue.", "Failed to transition issue.");
     });
 
     utils::nil(env)
@@ -278,52 +378,19 @@ fn transition_interactive(env: &Env) -> Result<Value<'_>> {
 #[defun]
 fn display(env: &Env, issue_key: String) -> Result<Value<'_>> {
     let issue = get_jiroscope().get_issue(&*issue_key)?;
-    utils::set_buffer_mode(utils::JiroscopeBufferMode::Issue);
     open_jiroscope_buffer(env)?;
 
-    let args = vec![format!("* {} *", issue_key).into_lisp(env)?];
+    current_buffer_face_println(env, &format!("* {} *", issue_key), "jiroscope-issue-key")?;
 
-    env.call("insert", &args)?;
+    current_buffer_println(env, &format!("Summary: {}", issue.fields.summary))?;
 
-    // create overlay with face "jiroscope-issue-key" for issue key
-
-    let args = vec![0.into_lisp(env)?, (issue_key.len() + 4).into_lisp(env)?];
-
-    let overlay = env.call("make-overlay", &args)?;
-
-    let args = vec![
-        overlay,
-        env.intern("face")?,
-        env.intern("jiroscope-issue-key")?,
-    ];
-
-    env.call("overlay-put", &args)?;
-
-    env.call("newline", [])?;
-
-    let args = vec![format!("Summary: {}", issue.fields.summary).into_lisp(env)?];
-
-    env.call("insert", &args)?;
-
-    env.call("newline", [])?;
+    current_buffer_println(env, &format!("Status: {}", issue.fields.status.name))?;
 
     if let Some(description) = issue.fields.description {
-        let args = vec![format!("Description: {}", description.to_markdown()).into_lisp(env)?];
-
-        env.call("insert", &args)?;
-
-        let args = vec![];
-
-        env.call("newline", &args)?;
+        current_buffer_println(env, &format!("Description: {}", description.to_markdown()))?;
     }
 
-    let args = vec![format!("Status: {}", issue.fields.status.name).into_lisp(env)?];
-
-    env.call("insert", &args)?;
-
-    let args = vec![];
-
-    env.call("newline", &args)?;
+    utils::set_buffer_mode(env, utils::JiroscopeBufferMode::Issue)?;
 
     utils::nil(env)
 }

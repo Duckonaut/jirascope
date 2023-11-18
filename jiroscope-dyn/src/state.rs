@@ -1,16 +1,62 @@
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-use emacs::{defun, Env};
+use emacs::{defun, Env, IntoLisp};
 use jiroscope_core::jira::{Issue, Project};
 
-use crate::{concurrent, get_jiroscope, utils, JIROSCOPE_BUFFER_NAME};
+use crate::{
+    concurrent, get_jiroscope,
+    utils::{self, current_buffer_button, current_buffer_print, current_buffer_println},
+    JIROSCOPE_BUFFER_NAME,
+};
 
 static STATE: OnceLock<Mutex<State>> = OnceLock::new();
+
+trait ConflictAware: Sized {
+    type Key;
+    fn key(&self) -> Self::Key;
+    fn lookup(values: &[Self], key: &Self::Key) -> Option<Self>;
+    fn has_changed(&self, other: &Self) -> bool;
+}
+
+impl ConflictAware for Issue {
+    type Key = String;
+    fn key(&self) -> Self::Key {
+        self.key.clone()
+    }
+    fn lookup(values: &[Self], key: &Self::Key) -> Option<Self> {
+        values.iter().find(|i| i.key == *key).cloned()
+    }
+    fn has_changed(&self, other: &Self) -> bool {
+        self.fields.updated != other.fields.updated
+    }
+}
+
+impl ConflictAware for Project {
+    type Key = String;
+    fn key(&self) -> Self::Key {
+        self.key.clone()
+    }
+    fn lookup(values: &[Self], key: &Self::Key) -> Option<Self> {
+        values.iter().find(|i| i.key == *key).cloned()
+    }
+    fn has_changed(&self, other: &Self) -> bool {
+        self != other
+    }
+}
+
+enum ConflictCell<T: ConflictAware> {
+    Empty,
+    Armed { key: T::Key },
+    Outdated { key: T::Key, old: T },
+    Deleted { key: T::Key },
+}
 
 pub struct State {
     projects: Vec<Project>,
     issues: Vec<Issue>,
     dirty: bool,
+    issue_rentcell: ConflictCell<Issue>,
+    project_rentcell: ConflictCell<Project>,
 }
 
 impl State {
@@ -19,6 +65,8 @@ impl State {
             projects: Vec::new(),
             issues: Vec::new(),
             dirty: false,
+            issue_rentcell: ConflictCell::Empty,
+            project_rentcell: ConflictCell::Empty,
         }
     }
 
@@ -26,8 +74,68 @@ impl State {
         &self.projects
     }
 
+    pub fn get_project(&self, key: &str) -> Option<Project> {
+        Project::lookup(&self.projects, &key.to_string())
+    }
+
     pub fn issues(&self) -> &[Issue] {
         &self.issues
+    }
+
+    pub fn get_issue(&self, key: &str) -> Option<Issue> {
+        Issue::lookup(&self.issues, &key.to_string())
+    }
+
+    pub fn check_out_issue(&mut self, issue_key: String) -> Result<(), jiroscope_core::Error> {
+        match self.issue_rentcell {
+            ConflictCell::Empty => {
+                self.issue_rentcell = ConflictCell::Armed { key: issue_key };
+                Ok(())
+            }
+            _ => Err(jiroscope_core::Error::jiroscope(
+                "Issue already checked out.",
+            )),
+        }
+    }
+
+    pub fn check_out_project(&mut self, project_key: String) -> Result<(), jiroscope_core::Error> {
+        match self.project_rentcell {
+            ConflictCell::Empty => {
+                self.project_rentcell = ConflictCell::Armed { key: project_key };
+                Ok(())
+            }
+            _ => Err(jiroscope_core::Error::jiroscope(
+                "Project already checked out.",
+            )),
+        }
+    }
+
+    pub fn try_return_issue<'a>(&mut self, issue_key: impl Into<&'a str>) -> bool {
+        match self.issue_rentcell {
+            ConflictCell::Armed { ref key } if key == issue_key.into() => {
+                self.issue_rentcell = ConflictCell::Empty;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub fn return_issue(&mut self) {
+        self.issue_rentcell = ConflictCell::Empty;
+    }
+
+    pub fn try_return_project<'a>(&mut self, project_key: impl Into<&'a str>) -> bool {
+        match self.project_rentcell {
+            ConflictCell::Armed { ref key } if key == project_key.into() => {
+                self.project_rentcell = ConflictCell::Empty;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub fn return_project(&mut self) {
+        self.project_rentcell = ConflictCell::Empty;
     }
 
     pub fn refresh(&mut self) -> Result<(), jiroscope_core::Error> {
@@ -35,6 +143,20 @@ impl State {
 
         if !new_projects.iter().eq(self.projects.iter()) {
             self.dirty = true;
+
+            if let ConflictCell::Armed { ref key } = self.project_rentcell {
+                if let Some(project) = Project::lookup(&new_projects, key) {
+                    let old = Project::lookup(&self.projects, key).expect("Project not found");
+                    if project.has_changed(&old) {
+                        self.project_rentcell = ConflictCell::Outdated {
+                            key: key.clone(),
+                            old,
+                        };
+                    }
+                } else {
+                    self.project_rentcell = ConflictCell::Deleted { key: key.clone() };
+                }
+            }
         }
 
         self.projects = new_projects;
@@ -45,6 +167,20 @@ impl State {
 
         if !new_issues.iter().eq(self.issues.iter()) {
             self.dirty = true;
+
+            if let ConflictCell::Armed { ref key } = self.issue_rentcell {
+                if let Some(issue) = Issue::lookup(&new_issues, key) {
+                    let old = Issue::lookup(&self.issues, key).expect("Issue not found");
+                    if issue.has_changed(&old) {
+                        self.issue_rentcell = ConflictCell::Outdated {
+                            key: key.clone(),
+                            old,
+                        };
+                    }
+                } else {
+                    self.issue_rentcell = ConflictCell::Deleted { key: key.clone() };
+                }
+            }
         }
 
         self.issues = new_issues;
@@ -102,15 +238,16 @@ fn update_buffers(env: &Env, state: &State) {
             print_tree(env, state)?;
 
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     }
 }
 
 #[defun]
-fn open(env: &emacs::Env) -> emacs::Result<()> {
+pub fn open(env: &emacs::Env) -> emacs::Result<()> {
     let state = get_state();
 
-    utils::set_buffer_mode(utils::JiroscopeBufferMode::Tree);
+    utils::set_buffer_mode(env, utils::JiroscopeBufferMode::Tree)?;
     utils::open_jiroscope_buffer(env)?;
 
     env.call("erase-buffer", [])?;
@@ -140,15 +277,15 @@ fn print_tree(env: &emacs::Env, state: &State) -> emacs::Result<()> {
 
         let size = issues.len();
         for (i, issue) in issues.iter().enumerate() {
-            env.call(
-                "insert",
-                (format!(
-                    "{} {}: {} - {}\n",
-                    get_icon(i, size),
-                    issue.key,
-                    issue.fields.summary,
-                    issue.fields.status.name
-                ),),
+            current_buffer_print(env, &format!("{} ", get_icon(i, size)))?;
+            current_buffer_button(
+                env,
+                &issue.key,
+                "jiroscope-issue-button"
+            )?;
+            current_buffer_println(
+                env,
+                &format!(": {} - {}", issue.fields.summary, issue.fields.status.name),
             )?;
         }
     }

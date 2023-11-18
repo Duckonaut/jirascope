@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Mutex};
 
 use emacs::{Env, IntoLisp, Result, Value};
 
-use crate::JIROSCOPE_BUFFER_NAME;
+use crate::{concurrent, state, JIROSCOPE_BUFFER_NAME};
 
 pub fn nil(env: &Env) -> Result<Value<'_>> {
     ().into_lisp(env)
@@ -163,6 +163,57 @@ pub fn prompt_string(env: &Env, prompt: &str) -> Option<String> {
     s.filter(|s| !s.is_empty())
 }
 
+pub fn prompt_force_change<'a>(env: &Env, reason: impl Into<&'a str>) -> Result<bool> {
+    let choice = env.call(
+        "y-or-n-p",
+        [format!("{}, force change? ", reason.into())
+            .into_lisp(env)
+            .unwrap()],
+    )?;
+
+    // y-or-n-p returns t for yes and nil for no
+    Ok(choice.is_not_nil())
+}
+
+pub fn signal_result_async<T, E>(
+    result: std::result::Result<T, E>,
+    on_success: &'static str,
+    on_failure: &'static str,
+) {
+    if result.is_ok() {
+        concurrent::push_command(Box::new(move |env| {
+            state::refresh(env)?;
+
+            env.call("message", [on_success.into_lisp(env)?])?;
+
+            Ok(())
+        }));
+    } else {
+        concurrent::push_command(Box::new(|env| {
+            env.call("message", [on_failure.into_lisp(env)?])?;
+
+            Ok(())
+        }));
+    }
+}
+
+pub fn signal_result<T, E>(
+    env: &Env,
+    result: std::result::Result<T, E>,
+    on_success: &'static str,
+    on_failure: &'static str,
+) -> emacs::Result<()> {
+    if result.is_ok() {
+        state::refresh(env)?;
+
+        env.call("message", [on_success.into_lisp(env)?])?;
+    } else {
+        env.call("message", [on_failure.into_lisp(env)?])?;
+    }
+
+    Ok(())
+}
+
 pub fn force_prompt_string(env: &Env, prompt: &str) -> emacs::Result<String> {
     let s = prompt_string(env, prompt);
 
@@ -188,17 +239,25 @@ pub fn goto_buffer(env: &Env, buffer_name: &str) -> Result<()> {
 }
 
 pub fn open_jiroscope_buffer(env: &Env) -> Result<()> {
-    let args = vec![JIROSCOPE_BUFFER_NAME.to_string().into_lisp(env)?];
+    let buffer = env.call(
+        "get-buffer-create",
+        [JIROSCOPE_BUFFER_NAME.to_string().into_lisp(env)?],
+    )?;
 
-    let buffer = env.call("get-buffer-create", &args)?;
-
-    let args = vec![buffer];
-
-    env.call("switch-to-buffer", &args)?;
+    env.call("switch-to-buffer", [buffer])?;
+    env.call("set", [env.intern("buffer-read-only")?, nil(env)?])?;
 
     env.call("erase-buffer", [])?;
 
     Ok(())
+}
+
+pub fn get_jiroscope_buffer_content(env: &Env) -> Result<String> {
+    with_buffer(env, JIROSCOPE_BUFFER_NAME, |env| {
+        let args = vec![];
+        let content = env.call("buffer-string", &args)?;
+        content.into_rust()
+    })
 }
 
 pub fn clear_jiroscope_buffer(env: &Env) -> Result<()> {
@@ -225,21 +284,104 @@ pub fn with_buffer<T, F: FnOnce(&Env) -> Result<T>>(
     f(env)
 }
 
+pub fn current_buffer_print(env: &Env, s: &str) -> Result<()> {
+    env.call("insert", [s.to_string().into_lisp(env)?])?;
+    Ok(())
+}
+
+pub fn current_buffer_println(env: &Env, s: &str) -> Result<()> {
+    current_buffer_print(env, s)?;
+    env.call("newline", [])?;
+    Ok(())
+}
+
+pub fn current_buffer_face_print(env: &Env, s: &str, face: &str) -> Result<()> {
+    let len = s.len();
+    let current_point = env.call("point", [])?.into_rust::<i64>()? - 1;
+    current_buffer_print(env, s)?;
+    let overlay = env.call(
+        "make-overlay",
+        [
+            current_point.into_lisp(env)?,
+            (current_point + len as i64).into_lisp(env)?,
+        ],
+    )?;
+
+    env.call(
+        "overlay-put",
+        [overlay, env.intern("face")?, env.intern(face)?],
+    )?;
+
+    Ok(())
+}
+
+pub fn current_buffer_face_println(env: &Env, s: &str, face: &str) -> Result<()> {
+    current_buffer_face_print(env, s, face)?;
+    env.call("newline", [])?;
+    Ok(())
+}
+
+pub fn current_buffer_button(env: &Env, s: &str, button_type: &str) -> Result<()> {
+    env.call(
+        "jiroscope-insert-button",
+        [
+            s.to_string().into_lisp(env)?,
+            env.intern(button_type)?,
+        ],
+    )?;
+    Ok(())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JiroscopeBufferMode {
     Issue,
     Project,
     Tree,
+    IssueEdit,
 }
 
 static JIROSCOPE_BUFFER_MODE: Mutex<JiroscopeBufferMode> = Mutex::new(JiroscopeBufferMode::Issue);
 
-pub fn set_buffer_mode(mode: JiroscopeBufferMode) {
+pub fn set_buffer_mode(env: &Env, mode: JiroscopeBufferMode) -> Result<()> {
     let mut buffer_mode = JIROSCOPE_BUFFER_MODE.lock().unwrap();
     *buffer_mode = mode;
+
+    with_buffer(env, JIROSCOPE_BUFFER_NAME, |env| {
+        match mode {
+            JiroscopeBufferMode::IssueEdit => {
+                env.call("set", [env.intern("buffer-read-only")?, nil(env)?])?;
+            }
+
+            _ => {
+                env.call(
+                    "set",
+                    [env.intern("buffer-read-only")?, "t".into_lisp(env)?],
+                )?;
+            }
+        }
+        Ok(())
+    })?;
+
+    Ok(())
 }
 
 pub fn get_buffer_mode() -> Option<JiroscopeBufferMode> {
     let buffer_mode = JIROSCOPE_BUFFER_MODE.lock().unwrap();
     Some(*buffer_mode)
+}
+
+pub struct ScopeCleaner<T: FnMut()> {
+    f: T,
+}
+
+impl<T: FnMut()> ScopeCleaner<T> {
+    pub fn new(f: T) -> Self {
+        Self { f }
+    }
+}
+
+impl<T: FnMut()> Drop for ScopeCleaner<T> {
+    fn drop(&mut self) {
+        (self.f)();
+    }
 }
