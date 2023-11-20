@@ -61,6 +61,21 @@
   "Face used for issue key headers."
   :group 'jiroscope)
 
+(defface jiroscope-diff-alert
+    '((t (:inherit font-lock-warning-face)))
+    "Face used for issue diff alerts."
+    :group 'jiroscope)
+
+(defface jiroscope-diff-new
+    '((t (:inherit font-lock-string-face)))
+    "Face used for issue new diff."
+    :group 'jiroscope)
+
+(defface jiroscope-diff-old
+    '((t (:inherit font-lock-doc-markup-face)))
+    "Face used for issue old diff."
+    :group 'jiroscope)
+
 (define-button-type 'jiroscope-issue-button
     'follow-link t
     'action 'jiroscope-dyn-issue-button-action)

@@ -1,6 +1,6 @@
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-use emacs::{defun, Env, IntoLisp};
+use emacs::{defun, Env};
 use jiroscope_core::jira::{Issue, Project};
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
 
 static STATE: OnceLock<Mutex<State>> = OnceLock::new();
 
-trait ConflictAware: Sized {
+pub(crate) trait ConflictAware: Sized {
     type Key;
     fn key(&self) -> Self::Key;
     fn lookup(values: &[Self], key: &Self::Key) -> Option<Self>;
@@ -44,7 +44,7 @@ impl ConflictAware for Project {
     }
 }
 
-enum ConflictCell<T: ConflictAware> {
+pub(crate) enum ConflictCell<T: ConflictAware> {
     Empty,
     Armed { key: T::Key },
     Outdated { key: T::Key, old: T },
@@ -84,6 +84,10 @@ impl State {
 
     pub fn get_issue(&self, key: &str) -> Option<Issue> {
         Issue::lookup(&self.issues, &key.to_string())
+    }
+
+    pub(crate) fn get_current_work_issue(&self) -> &ConflictCell<Issue> {
+        &self.issue_rentcell
     }
 
     pub fn check_out_issue(&mut self, issue_key: String) -> Result<(), jiroscope_core::Error> {
@@ -278,11 +282,7 @@ fn print_tree(env: &emacs::Env, state: &State) -> emacs::Result<()> {
         let size = issues.len();
         for (i, issue) in issues.iter().enumerate() {
             current_buffer_print(env, &format!("{} ", get_icon(i, size)))?;
-            current_buffer_button(
-                env,
-                &issue.key,
-                "jiroscope-issue-button"
-            )?;
+            current_buffer_button(env, &issue.key, "jiroscope-issue-button")?;
             current_buffer_println(
                 env,
                 &format!(": {} - {}", issue.fields.summary, issue.fields.status.name),

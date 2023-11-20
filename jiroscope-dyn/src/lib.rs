@@ -21,6 +21,7 @@ emacs::plugin_is_GPL_compatible!();
 
 static JIROSCOPE: OnceLock<Mutex<Jiroscope>> = OnceLock::new();
 static JIROSCOPE_BUFFER_NAME: &str = "*jiroscope*";
+static JIROSCOPE_DIFF_BUFFER_NAME: &str = "*jiroscope-diff*";
 
 // Register the initialization hook that Emacs will call when it loads the module.
 #[emacs::module]

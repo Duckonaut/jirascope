@@ -7,12 +7,14 @@ use jiroscope_core::jira::{
 
 use crate::{
     concurrent, get_jiroscope,
-    state::{self, get_state},
+    state::{self, get_state, ConflictCell},
     utils::{
-        self, current_buffer_face_println, current_buffer_println, get_jiroscope_buffer_content,
-        open_jiroscope_buffer, prompt_force_change, signal_result, signal_result_async,
-        ScopeCleaner,
+        self, close_jiroscope_diff_buffer, current_buffer_face_println, current_buffer_println,
+        get_jiroscope_buffer_content, open_jiroscope_buffer, open_jiroscope_diff_buffer,
+        prompt_force_change, signal_result, signal_result_async, with_buffer, ScopeCleaner,
+        JIROSCOPE_FACE_DIFF_ALERT, JIROSCOPE_FACE_DIFF_NEW, JIROSCOPE_FACE_DIFF_OLD,
     },
+    JIROSCOPE_DIFF_BUFFER_NAME,
 };
 
 fn prompt_issue(env: &Env) -> Option<Issue> {
@@ -297,6 +299,8 @@ fn edit_graphical_finish(env: &Env) -> Result<Value<'_>> {
                     ["Issue changed since last access.".into_lisp(env)?],
                 )?;
 
+                display_old_and_changed(env)?;
+
                 if prompt_force_change(env, "Issue changed since last access")? {
                     let result = get_jiroscope().edit_issue(&*key, issue_edit);
 
@@ -306,6 +310,8 @@ fn edit_graphical_finish(env: &Env) -> Result<Value<'_>> {
 
                     state::get_state().check_out_issue(key.clone())?;
                 }
+
+                close_jiroscope_diff_buffer(env)?;
 
                 Ok(())
             }));
@@ -326,6 +332,80 @@ fn edit_graphical_finish(env: &Env) -> Result<Value<'_>> {
     });
 
     utils::nil(env)
+}
+
+fn display_old_and_changed(env: &Env) -> Result<()> {
+    let state = get_state();
+
+    let work_issue = state.get_current_work_issue();
+
+    if matches!(work_issue, ConflictCell::Empty | ConflictCell::Armed { .. }) {
+        return Ok(());
+    }
+
+    with_buffer(env, JIROSCOPE_DIFF_BUFFER_NAME, |env| {
+        env.call("erase-buffer", [])?;
+        match work_issue {
+            ConflictCell::Deleted { key } => {
+                current_buffer_face_println(env, &format!("* {} *", key), "jiroscope-issue-key")?;
+                current_buffer_face_println(env, "Issue was deleted.", JIROSCOPE_FACE_DIFF_ALERT)?;
+            }
+            ConflictCell::Outdated { key, old } => {
+                current_buffer_face_println(env, &format!("* {} *", key), "jiroscope-issue-key")?;
+                current_buffer_face_println(
+                    env,
+                    "Issue was changed since last access.",
+                    JIROSCOPE_FACE_DIFF_ALERT,
+                )?;
+                current_buffer_face_println(env, "Old:", JIROSCOPE_FACE_DIFF_ALERT)?;
+                current_buffer_face_println(
+                    env,
+                    &format!("Summary: {}", old.fields.summary),
+                    JIROSCOPE_FACE_DIFF_OLD,
+                )?;
+                current_buffer_face_println(
+                    env,
+                    &format!("Status: {}", old.fields.status.name,),
+                    JIROSCOPE_FACE_DIFF_OLD,
+                )?;
+
+                if let Some(ref description) = old.fields.description {
+                    current_buffer_face_println(
+                        env,
+                        &format!("Description: {}", description.to_markdown()),
+                        JIROSCOPE_FACE_DIFF_OLD,
+                    )?;
+                }
+                current_buffer_face_println(env, "New:", JIROSCOPE_FACE_DIFF_ALERT)?;
+                let current = state.get_issue(key).unwrap();
+
+                current_buffer_face_println(
+                    env,
+                    &format!("Summary: {}", current.fields.summary),
+                    JIROSCOPE_FACE_DIFF_NEW,
+                )?;
+                current_buffer_face_println(
+                    env,
+                    &format!("Status: {}", current.fields.status.name),
+                    JIROSCOPE_FACE_DIFF_NEW,
+                )?;
+
+                if let Some(ref description) = current.fields.description {
+                    current_buffer_face_println(
+                        env,
+                        &format!("Description: {}", description.to_markdown()),
+                        JIROSCOPE_FACE_DIFF_NEW,
+                    )?;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    })?;
+
+    open_jiroscope_diff_buffer(env)?;
+
+    Ok(())
 }
 
 #[defun]

@@ -2,7 +2,11 @@ use std::{fmt::Display, sync::Mutex};
 
 use emacs::{Env, IntoLisp, Result, Value};
 
-use crate::{concurrent, state, JIROSCOPE_BUFFER_NAME};
+use crate::{concurrent, state, JIROSCOPE_BUFFER_NAME, JIROSCOPE_DIFF_BUFFER_NAME};
+
+pub(crate) static JIROSCOPE_FACE_DIFF_ALERT: &str = "jiroscope-diff-alert";
+pub(crate) static JIROSCOPE_FACE_DIFF_NEW: &str = "jiroscope-diff-new";
+pub(crate) static JIROSCOPE_FACE_DIFF_OLD: &str = "jiroscope-diff-old";
 
 pub fn nil(env: &Env) -> Result<Value<'_>> {
     ().into_lisp(env)
@@ -252,6 +256,28 @@ pub fn open_jiroscope_buffer(env: &Env) -> Result<()> {
     Ok(())
 }
 
+pub fn open_jiroscope_diff_buffer(env: &Env) -> Result<()> {
+    let buffer = env.call(
+        "get-buffer-create",
+        [JIROSCOPE_DIFF_BUFFER_NAME.to_string().into_lisp(env)?],
+    )?;
+
+    env.call("display-buffer-in-side-window", [buffer, nil(env)?])?;
+
+    Ok(())
+}
+
+pub fn close_jiroscope_diff_buffer(env: &Env) -> Result<()> {
+    let buffer = env.call(
+        "get-buffer-create",
+        [JIROSCOPE_DIFF_BUFFER_NAME.to_string().into_lisp(env)?],
+    )?;
+
+    env.call("kill-buffer", [buffer])?;
+
+    Ok(())
+}
+
 pub fn get_jiroscope_buffer_content(env: &Env) -> Result<String> {
     with_buffer(env, JIROSCOPE_BUFFER_NAME, |env| {
         let args = vec![];
@@ -303,7 +329,7 @@ pub fn current_buffer_face_print(env: &Env, s: &str, face: &str) -> Result<()> {
         "make-overlay",
         [
             current_point.into_lisp(env)?,
-            (current_point + len as i64).into_lisp(env)?,
+            (current_point + 1 + len as i64).into_lisp(env)?,
         ],
     )?;
 
