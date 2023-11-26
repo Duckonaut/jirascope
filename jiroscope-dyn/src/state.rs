@@ -273,20 +273,53 @@ fn print_tree(env: &emacs::Env, state: &State) -> emacs::Result<()> {
     for project in state.projects() {
         env.call("insert", (format!("{}: {}\n", project.key, project.name),))?;
 
-        let issues = state
+        let mut issues = state
             .issues()
             .iter()
-            .filter(|i| i.fields.project.key == project.key)
+            .filter(|i| i.fields.project.key == project.key && i.fields.parent.is_none())
             .collect::<Vec<_>>();
+
+        issues.sort_by_key(|i| &i.key);
+
+        let mut subtask_issues = state
+            .issues()
+            .iter()
+            .filter(|i| i.fields.project.key == project.key && i.fields.parent.is_some())
+            .collect::<Vec<_>>();
+
+        subtask_issues.sort_by_key(|i| &i.key);
 
         let size = issues.len();
         for (i, issue) in issues.iter().enumerate() {
             current_buffer_print(env, &format!("{} ", get_icon(i, size)))?;
+
             current_buffer_button(env, &issue.key, "jiroscope-issue-button")?;
             current_buffer_println(
                 env,
                 &format!(": {} - {}", issue.fields.summary, issue.fields.status.name),
             )?;
+
+            let issue_subtasks = subtask_issues
+                .iter()
+                .filter(|i| {
+                    i.fields.parent.as_ref().unwrap().id == issue.id
+                })
+                .collect::<Vec<_>>();
+
+            let subtask_size = issue_subtasks.len();
+
+            for (i, subtask) in issue_subtasks.iter().enumerate() {
+                current_buffer_print(env, &format!("  {} ", get_icon(i, subtask_size)))?;
+
+                current_buffer_button(env, &subtask.key, "jiroscope-issue-button")?;
+                current_buffer_println(
+                    env,
+                    &format!(
+                        ": {} - {}",
+                        subtask.fields.summary, subtask.fields.status.name
+                    ),
+                )?;
+            }
         }
     }
 

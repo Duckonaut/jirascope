@@ -399,7 +399,6 @@ impl Content {
     /// }
     /// ```
     pub fn flatten(mut self) -> Vec<Self> {
-        println!("Flattening: {:?}", self);
         if self.inline() && self.content.is_some() {
             let mut flattened = Vec::new();
             for child in self.content.unwrap() {
@@ -418,7 +417,6 @@ impl Content {
                     flattened.extend(c);
                 }
             }
-            dbg!(&flattened);
             flattened
         } else {
             if let Some(content) = self.content {

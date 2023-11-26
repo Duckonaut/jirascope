@@ -19,3 +19,18 @@ pub struct Paginated<T> {
     pub is_last: bool,
     pub values: Vec<T>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WrappedId {
+    #[serde(
+        serialize_with = "crate::utils::serialize_id",
+        deserialize_with = "crate::utils::deserialize_id"
+    )]
+    pub id: i64,
+}
+
+impl WrappedId {
+    pub fn new(id: i64) -> Self {
+        Self { id }
+    }
+}

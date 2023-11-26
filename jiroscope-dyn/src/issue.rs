@@ -2,7 +2,7 @@ use std::thread;
 
 use emacs::{defun, Env, IntoLisp, Result, Value};
 use jiroscope_core::jira::{
-    AtlassianDoc, Issue, IssueCreation, IssueCreationFields, IssueEdit, IssueTransitionDescriptor,
+    AtlassianDoc, Issue, IssueCreation, IssueCreationFields, IssueEdit, IssueTransitionDescriptor, WrappedId,
 };
 
 use crate::{
@@ -56,6 +56,30 @@ fn prompt_issue_transition(env: &Env, issue_key: &str) -> Option<IssueTransition
     Some(issue_transitions.remove(index))
 }
 
+fn prompt_issue_parent(env: &Env, project_key: &str) -> Option<i64> {
+    let state = get_state();
+    // let user choose issue status
+    let mut issue_parents = state.issues().iter().filter_map(|i| {
+        if i.fields.project.key == project_key {
+            Some((i.id, i.key.clone()))
+        } else {
+            None
+        }
+    });
+
+    let index = utils::prompt_select_index(
+        env,
+        "Choose parent issue: ",
+        issue_parents
+            .clone()
+            .map(|(_, k)| k)
+            .collect::<Vec<_>>()
+            .as_slice(),
+    )?;
+
+    Some(issue_parents.nth(index).unwrap().0)
+}
+
 #[defun]
 fn create_interactive(env: &Env) -> Result<Value<'_>> {
     let mut jiroscope = get_jiroscope();
@@ -78,6 +102,7 @@ fn create_interactive(env: &Env) -> Result<Value<'_>> {
     }
 
     let project = projects[index.unwrap()].clone();
+    drop(state);
 
     // let user choose issue type
     let create_meta = jiroscope.get_issue_creation_meta()?;
@@ -104,6 +129,18 @@ fn create_interactive(env: &Env) -> Result<Value<'_>> {
 
     let issue_type = issue_types.remove(index.unwrap());
 
+    let parent = if issue_type.is_subtask {
+        let parent_id = prompt_issue_parent(env, &project.key);
+
+        if parent_id.is_none() {
+            return utils::nil(env);
+        }
+
+        parent_id
+    } else {
+        None
+    };
+
     // let user enter summary
     let summary = utils::prompt_string(env, "Enter issue summary: ");
 
@@ -126,6 +163,7 @@ fn create_interactive(env: &Env) -> Result<Value<'_>> {
             description,
             priority: None,
             assignee: None,
+            parent: parent.map(WrappedId::new),
         },
     };
 

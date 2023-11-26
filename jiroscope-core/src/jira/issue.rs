@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use ureq::serde_json::Value;
 
-use super::{Project, AtlassianDoc, User};
+use super::{AtlassianDoc, Project, User, WrappedId};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Issues {
@@ -12,7 +12,8 @@ pub struct Issues {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Issue {
-    pub id: String,
+    #[serde(deserialize_with = "crate::utils::deserialize_id")]
+    pub id: i64,
     pub key: String,
     pub fields: IssueFields,
 }
@@ -28,6 +29,8 @@ pub struct IssueFields {
     pub created: String, // ISO 8601 date/time string
     pub updated: String, // ISO 8601 date/time string
     pub project: Project,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<WrappedId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,11 +50,14 @@ pub struct IssueCreationFields {
     pub priority: Option<Priority>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub assignee: Option<User>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<WrappedId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreatedIssue {
-    pub id: String,
+    #[serde(deserialize_with = "crate::utils::deserialize_id")]
+    pub id: i64,
     pub key: String,
     #[serde(rename = "self")]
     pub self_link: String,
@@ -83,13 +89,15 @@ pub struct Priority {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Status {
-    pub id: String,
+    #[serde(deserialize_with = "crate::utils::deserialize_id")]
+    pub id: i64,
     pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssueEvent {
-    pub id: isize,
+    #[serde(deserialize_with = "crate::utils::deserialize_id")]
+    pub id: i64,
     pub name: String,
 }
 
@@ -100,6 +108,7 @@ pub struct IssueCreationMeta {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectIssueCreationMeta {
+    #[serde(deserialize_with = "crate::utils::deserialize_id")]
     pub id: i64,
     pub key: String,
     pub name: String,
@@ -146,7 +155,8 @@ pub struct MetaFieldSchema {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssueTransitionDescriptor {
-    pub id: String,
+    #[serde(deserialize_with = "crate::utils::deserialize_id")]
+    pub id: i64,
     pub name: String,
     pub to: Status,
 }
@@ -160,4 +170,3 @@ pub struct IssueTransitionDescriptors {
 pub struct IssueTransition {
     pub transition: IssueTransitionDescriptor,
 }
-

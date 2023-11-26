@@ -20,3 +20,12 @@ where
         ))),
     }
 }
+
+/// Serialize a Jira ID.
+/// Always serialize as a string.
+pub fn serialize_id<S>(id: &i64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&id.to_string())
+}

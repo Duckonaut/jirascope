@@ -143,6 +143,7 @@ impl Jiroscope {
     }
 
     pub fn create_issue(&mut self, issue: IssueCreation) -> Result<CreatedIssue, crate::Error> {
+        println!("Creating issue: {}", ureq::serde_json::to_string(&issue).unwrap());
         let response = self.api_post("issue", issue)?;
 
         let created_issue: CreatedIssue = response.into_json()?;
@@ -155,7 +156,6 @@ impl Jiroscope {
         issue_id: impl Into<&'a str>,
         issue: IssueEdit,
     ) -> Result<(), crate::Error> {
-        println!("{:?}", issue);
         self.api_put(format!("issue/{}", issue_id.into()).as_str(), issue)?;
 
         Ok(())
