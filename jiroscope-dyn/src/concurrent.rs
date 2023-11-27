@@ -5,6 +5,8 @@ use std::{
 
 use emacs::{defun, Env, IntoLisp, Value};
 
+use crate::utils;
+
 pub(crate) type Command = dyn FnOnce(&Env) -> emacs::Result<()> + Send + 'static;
 
 pub(crate) struct CommandEntry {
@@ -62,6 +64,10 @@ pub(crate) fn flush_commands(env: &Env) -> emacs::Result<()> {
 
 #[defun]
 fn event_handler(env: &Env) -> emacs::Result<()> {
+    if utils::workthread_count() > 0 {
+        env.message("[jiroscope] Task running...")?;
+    }
+
     flush_commands(env)
 }
 
@@ -70,8 +76,8 @@ pub(crate) fn install_handler(env: &Env) -> emacs::Result<Value<'_>> {
     env.call(
         "run-with-timer",
         [
-            0.2.into_lisp(env)?,
-            0.2.into_lisp(env)?,
+            0.1.into_lisp(env)?,
+            0.1.into_lisp(env)?,
             env.intern("jiroscope-dyn-concurrent-event-handler")?,
         ],
     )

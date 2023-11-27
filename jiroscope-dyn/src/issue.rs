@@ -1,8 +1,7 @@
-use std::thread;
-
 use emacs::{defun, Env, IntoLisp, Result, Value};
 use jiroscope_core::jira::{
-    AtlassianDoc, Issue, IssueCreation, IssueCreationFields, IssueEdit, IssueTransitionDescriptor, WrappedId,
+    AtlassianDoc, Issue, IssueCreation, IssueCreationFields, IssueEdit, IssueTransitionDescriptor,
+    WrappedId,
 };
 
 use crate::{
@@ -11,8 +10,8 @@ use crate::{
     utils::{
         self, close_jiroscope_diff_buffer, current_buffer_face_println, current_buffer_println,
         get_jiroscope_buffer_content, open_jiroscope_buffer, open_jiroscope_diff_buffer,
-        prompt_force_change, signal_result, signal_result_async, with_buffer, ScopeCleaner,
-        JIROSCOPE_FACE_DIFF_ALERT, JIROSCOPE_FACE_DIFF_NEW, JIROSCOPE_FACE_DIFF_OLD,
+        prompt_force_change, signal_result, signal_result_async, with_buffer, workthread_spawn,
+        ScopeCleaner, JIROSCOPE_FACE_DIFF_ALERT, JIROSCOPE_FACE_DIFF_NEW, JIROSCOPE_FACE_DIFF_OLD,
     },
     JIROSCOPE_DIFF_BUFFER_NAME,
 };
@@ -167,20 +166,20 @@ fn create_interactive(env: &Env) -> Result<Value<'_>> {
         },
     };
 
-    thread::spawn(move || {
+    workthread_spawn(move || {
         let result = get_jiroscope().create_issue(issue_creation);
 
         if result.is_ok() {
             concurrent::push_command(Box::new(|env| {
                 state::refresh(env)?;
 
-                env.call("message", ["Created issue.".into_lisp(env)?])?;
+                env.message("Issue created successfully.")?;
 
                 Ok(())
             }));
         } else {
             concurrent::push_command(Box::new(|env| {
-                env.call("message", ["Failed to create issue.".into_lisp(env)?])?;
+                env.message("Failed to create issue.")?;
 
                 Ok(())
             }));
@@ -222,13 +221,10 @@ fn edit_interactive(env: &Env) -> Result<Value<'_>> {
     )
     .map(|d| AtlassianDoc::from_markdown(&d));
 
-    thread::spawn(move || {
+    workthread_spawn(move || {
         if !get_state().try_return_issue(&*issue.key) {
             concurrent::push_command(Box::new(move |env| {
-                env.call(
-                    "message",
-                    ["Issue changed since last access.".into_lisp(env)?],
-                )?;
+                env.message("Issue changed since last access. Please check the diff buffer.")?;
 
                 if prompt_force_change(env, "Issue changed since last access")? {
                     let result = get_jiroscope().edit_issue(&*issue.key, issue_edit);
@@ -329,13 +325,10 @@ fn edit_graphical_finish(env: &Env) -> Result<Value<'_>> {
         Some(AtlassianDoc::from_markdown(description_str))
     };
 
-    thread::spawn(move || {
+    workthread_spawn(move || {
         if !get_state().try_return_issue(&*key) {
             concurrent::push_command(Box::new(move |env| {
-                env.call(
-                    "message",
-                    ["Issue changed since last access.".into_lisp(env)?],
-                )?;
+                env.message("Issue changed since last access.")?;
 
                 display_old_and_changed(env)?;
 
@@ -457,7 +450,7 @@ fn delete_interactive(env: &Env) -> Result<Value<'_>> {
     let issue = issue.unwrap();
     let issue_key = issue.key;
 
-    thread::spawn(move || {
+    workthread_spawn(move || {
         let result = get_jiroscope().delete_issue(&*issue_key);
         signal_result_async(result, "Issue deleted.", "Failed to delete issue.");
     });
@@ -484,7 +477,7 @@ fn transition_interactive(env: &Env) -> Result<Value<'_>> {
 
     let transition = transition.unwrap();
 
-    thread::spawn(move || {
+    workthread_spawn(move || {
         let result = get_jiroscope().transition_issue(issue_key.as_str(), transition);
 
         signal_result_async(result, "Transitioned issue.", "Failed to transition issue.");

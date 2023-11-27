@@ -279,7 +279,7 @@ fn print_tree(env: &emacs::Env, state: &State) -> emacs::Result<()> {
             .filter(|i| i.fields.project.key == project.key && i.fields.parent.is_none())
             .collect::<Vec<_>>();
 
-        issues.sort_by_key(|i| &i.key);
+        issues.sort_by_key(|i| &i.id);
 
         let mut subtask_issues = state
             .issues()
@@ -287,7 +287,7 @@ fn print_tree(env: &emacs::Env, state: &State) -> emacs::Result<()> {
             .filter(|i| i.fields.project.key == project.key && i.fields.parent.is_some())
             .collect::<Vec<_>>();
 
-        subtask_issues.sort_by_key(|i| &i.key);
+        subtask_issues.sort_by_key(|i| &i.id);
 
         let size = issues.len();
         for (i, issue) in issues.iter().enumerate() {
@@ -301,9 +301,7 @@ fn print_tree(env: &emacs::Env, state: &State) -> emacs::Result<()> {
 
             let issue_subtasks = subtask_issues
                 .iter()
-                .filter(|i| {
-                    i.fields.parent.as_ref().unwrap().id == issue.id
-                })
+                .filter(|i| i.fields.parent.as_ref().unwrap().id == issue.id)
                 .collect::<Vec<_>>();
 
             let subtask_size = issue_subtasks.len();

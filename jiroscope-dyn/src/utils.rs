@@ -1,4 +1,7 @@
-use std::{fmt::Display, sync::Mutex};
+use std::{
+    fmt::Display,
+    sync::{atomic::AtomicUsize, Mutex},
+};
 
 use emacs::{Env, IntoLisp, Result, Value};
 
@@ -188,13 +191,13 @@ pub fn signal_result_async<T, E>(
         concurrent::push_command(Box::new(move |env| {
             state::refresh(env)?;
 
-            env.call("message", [on_success.into_lisp(env)?])?;
+            env.message(on_success)?;
 
             Ok(())
         }));
     } else {
-        concurrent::push_command(Box::new(|env| {
-            env.call("message", [on_failure.into_lisp(env)?])?;
+        concurrent::push_command(Box::new(move |env| {
+            env.message(on_failure)?;
 
             Ok(())
         }));
@@ -210,9 +213,9 @@ pub fn signal_result<T, E>(
     if result.is_ok() {
         state::refresh(env)?;
 
-        env.call("message", [on_success.into_lisp(env)?])?;
+        env.message(on_success)?;
     } else {
-        env.call("message", [on_failure.into_lisp(env)?])?;
+        env.message(on_failure)?;
     }
 
     Ok(())
@@ -350,10 +353,7 @@ pub fn current_buffer_face_println(env: &Env, s: &str, face: &str) -> Result<()>
 pub fn current_buffer_button(env: &Env, s: &str, button_type: &str) -> Result<()> {
     env.call(
         "jiroscope-insert-button",
-        [
-            s.to_string().into_lisp(env)?,
-            env.intern(button_type)?,
-        ],
+        [s.to_string().into_lisp(env)?, env.intern(button_type)?],
     )?;
     Ok(())
 }
@@ -410,4 +410,28 @@ impl<T: FnMut()> Drop for ScopeCleaner<T> {
     fn drop(&mut self) {
         (self.f)();
     }
+}
+
+static WORKTHREAD_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+pub fn workthread_panic_cleanup() {
+    WORKTHREAD_COUNTER.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+}
+
+pub fn workthread_spawn<T: Send + 'static>(
+    f: impl FnOnce() -> T + Send + 'static,
+) -> std::thread::JoinHandle<T> {
+    WORKTHREAD_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+    std::thread::spawn(move || {
+        let result = f();
+
+        WORKTHREAD_COUNTER.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+
+        result
+    })
+}
+
+pub fn workthread_count() -> usize {
+    WORKTHREAD_COUNTER.load(std::sync::atomic::Ordering::SeqCst)
 }

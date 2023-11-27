@@ -35,6 +35,13 @@ fn init(env: &Env) -> Result<()> {
     )?;
 
     concurrent::install_handler(env)?;
+
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        utils::workthread_panic_cleanup();
+        // propagate panic to the default handler
+        default_hook(info);
+    }));
     Ok(())
 }
 

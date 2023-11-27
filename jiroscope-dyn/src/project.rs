@@ -1,12 +1,10 @@
-use std::thread;
-
 use emacs::{defun, Env, IntoLisp, Result, Value};
 use jiroscope_core::jira::{
     ProjectCreate, ProjectCreateDetails, PROJECT_TEMPLATES, PROJECT_TYPE_KEYS,
     PROJECT_TYPE_NAMES_TO_TEMPLATE_RANGE,
 };
 
-use crate::{concurrent, get_jiroscope, state, utils};
+use crate::{concurrent, get_jiroscope, state, utils::{self, workthread_spawn}};
 
 #[defun]
 fn create_interactive(env: &Env) -> Result<Value<'_>> {
@@ -125,20 +123,20 @@ fn create_interactive(env: &Env) -> Result<Value<'_>> {
         },
     };
 
-    thread::spawn(move || {
+    workthread_spawn(move || {
         let result = get_jiroscope().create_project(project_create);
 
         if result.is_ok() {
             concurrent::push_command(Box::new(|env| {
                 state::refresh(env)?;
 
-                env.call("message", ["Project created successfully.".into_lisp(env)?])?;
+                env.message("Project created successfully.")?;
 
                 Ok(())
             }));
         } else {
             concurrent::push_command(Box::new(|env| {
-                env.call("message", ["Failed to create project.".into_lisp(env)?])?;
+                env.message("Failed to create project.")?;
 
                 Ok(())
             }));
@@ -168,23 +166,20 @@ fn delete_project_interactive(env: &Env) -> Result<Value<'_>> {
 
     let project_key = projects[index.unwrap()].key.clone();
 
-    thread::spawn(move || {
+    workthread_spawn(move || {
         let result = get_jiroscope().delete_project(&*project_key);
 
         if result.is_ok() {
             concurrent::push_command(Box::new(move |env| {
                 state::refresh(env)?;
 
-                env.call(
-                    "message",
-                    [format!("Deleted project {}.", project_key).into_lisp(env)?],
-                )?;
+                env.message(format!("Deleted project {}.", project_key).as_str())?;
 
                 Ok(())
             }));
         } else {
             concurrent::push_command(Box::new(|env| {
-                env.call("message", ["Failed to delete project.".into_lisp(env)?])?;
+                env.message("Failed to delete project.")?;
 
                 Ok(())
             }));
