@@ -1,15 +1,15 @@
 use jira::{
     CreatedIssue, IssueCreation, IssueCreationMeta, IssueEdit, IssueEditMeta, IssueEvent,
     IssueTransition, IssueTransitionDescriptor, IssueTransitionDescriptors, Issues, Paginated,
-    Project, ProjectCategory, ProjectCreate, ProjectCreated, ProjectIssueSecurityScheme, User,
+    Project, ProjectCategory, ProjectCreate, ProjectCreated, ProjectIssueSecurityScheme, User, ProjectEdit,
 };
 use serde::Serialize;
 
 mod auth;
 mod config;
 mod error;
-mod utils;
 pub mod jira;
+mod utils;
 
 pub use auth::Auth;
 pub use config::Config;
@@ -143,7 +143,10 @@ impl Jiroscope {
     }
 
     pub fn create_issue(&mut self, issue: IssueCreation) -> Result<CreatedIssue, crate::Error> {
-        println!("Creating issue: {}", ureq::serde_json::to_string(&issue).unwrap());
+        println!(
+            "Creating issue: {}",
+            ureq::serde_json::to_string(&issue).unwrap()
+        );
         let response = self.api_post("issue", issue)?;
 
         let created_issue: CreatedIssue = response.into_json()?;
@@ -201,6 +204,16 @@ impl Jiroscope {
         let new_project: ProjectCreated = response.into_json()?;
 
         Ok(new_project)
+    }
+
+    pub fn edit_project<'a>(
+        &mut self,
+        project_id: impl Into<&'a str>,
+        project: ProjectEdit,
+    ) -> Result<(), crate::Error> {
+        self.api_put(format!("project/{}", project_id.into()).as_str(), project)?;
+
+        Ok(())
     }
 
     pub fn delete_project<'a>(

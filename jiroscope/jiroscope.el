@@ -48,6 +48,10 @@
   (interactive)
   (jiroscope-dyn-project-create-interactive))
 
+(defun jiroscope-project-edit ()
+  (interactive)
+  (jiroscope-dyn-project-edit-interactive))
+
 (defun jiroscope-project-delete ()
   (interactive)
   (jiroscope-dyn-project-delete-interactive))

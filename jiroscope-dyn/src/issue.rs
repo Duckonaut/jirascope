@@ -1,4 +1,4 @@
-use emacs::{defun, Env, IntoLisp, Result, Value};
+use emacs::{defun, Env, Result, Value};
 use jiroscope_core::jira::{
     AtlassianDoc, Issue, IssueCreation, IssueCreationFields, IssueEdit, IssueTransitionDescriptor,
     WrappedId,
