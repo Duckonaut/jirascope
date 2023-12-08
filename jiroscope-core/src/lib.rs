@@ -1,7 +1,8 @@
 use jira::{
     CreatedIssue, IssueCreation, IssueCreationMeta, IssueEdit, IssueEditMeta, IssueEvent,
     IssueTransition, IssueTransitionDescriptor, IssueTransitionDescriptors, Issues, Paginated,
-    Project, ProjectCategory, ProjectCreate, ProjectCreated, ProjectIssueSecurityScheme, User, ProjectEdit,
+    ProjectCategory, ProjectCreate, ProjectCreated, ProjectDetailed, ProjectEdit,
+    ProjectIssueSecurityScheme, User,
 };
 use serde::Serialize;
 
@@ -91,10 +92,10 @@ impl Jiroscope {
         Ok(users)
     }
 
-    pub fn get_projects(&mut self) -> Result<Vec<Project>, crate::Error> {
-        let response = self.api_get("project")?;
+    pub fn get_projects(&mut self) -> Result<Vec<ProjectDetailed>, crate::Error> {
+        let response = self.api_get("project?expand=description,lead,url")?;
 
-        let projects: Vec<Project> = response.into_json()?;
+        let projects: Vec<ProjectDetailed> = response.into_json()?;
 
         Ok(projects)
     }

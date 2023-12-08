@@ -1,7 +1,7 @@
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use emacs::{defun, Env};
-use jiroscope_core::jira::{Issue, Project};
+use jiroscope_core::jira::{Issue, Project, ProjectDetailed};
 
 use crate::{
     concurrent, get_jiroscope,
@@ -31,7 +31,7 @@ impl ConflictAware for Issue {
     }
 }
 
-impl ConflictAware for Project {
+impl ConflictAware for ProjectDetailed {
     type Key = String;
     fn key(&self) -> Self::Key {
         self.key.clone()
@@ -52,11 +52,11 @@ pub(crate) enum ConflictCell<T: ConflictAware> {
 }
 
 pub struct State {
-    projects: Vec<Project>,
+    projects: Vec<ProjectDetailed>,
     issues: Vec<Issue>,
     dirty: bool,
     issue_rentcell: ConflictCell<Issue>,
-    project_rentcell: ConflictCell<Project>,
+    project_rentcell: ConflictCell<ProjectDetailed>,
 }
 
 impl State {
@@ -70,12 +70,16 @@ impl State {
         }
     }
 
-    pub fn projects(&self) -> &[Project] {
+    pub fn projects(&self) -> &[ProjectDetailed] {
         &self.projects
     }
 
+    pub fn get_project_detailed(&self, key: &str) -> Option<ProjectDetailed> {
+        ProjectDetailed::lookup(&self.projects, &key.to_string())
+    }
+
     pub fn get_project(&self, key: &str) -> Option<Project> {
-        Project::lookup(&self.projects, &key.to_string())
+        ProjectDetailed::lookup(&self.projects, &key.to_string()).map(ProjectDetailed::to_project)
     }
 
     pub fn issues(&self) -> &[Issue] {
@@ -84,6 +88,10 @@ impl State {
 
     pub fn get_issue(&self, key: &str) -> Option<Issue> {
         Issue::lookup(&self.issues, &key.to_string())
+    }
+
+    pub(crate) fn get_current_work_project(&self) -> &ConflictCell<ProjectDetailed> {
+        &self.project_rentcell
     }
 
     pub(crate) fn get_current_work_issue(&self) -> &ConflictCell<Issue> {
@@ -149,8 +157,9 @@ impl State {
             self.dirty = true;
 
             if let ConflictCell::Armed { ref key } = self.project_rentcell {
-                if let Some(project) = Project::lookup(&new_projects, key) {
-                    let old = Project::lookup(&self.projects, key).expect("Project not found");
+                if let Some(project) = ProjectDetailed::lookup(&new_projects, key) {
+                    let old =
+                        ProjectDetailed::lookup(&self.projects, key).expect("Project not found");
                     if project.has_changed(&old) {
                         self.project_rentcell = ConflictCell::Outdated {
                             key: key.clone(),
@@ -271,7 +280,8 @@ fn get_icon(i: usize, len: usize) -> &'static str {
 
 fn print_tree(env: &emacs::Env, state: &State) -> emacs::Result<()> {
     for project in state.projects() {
-        env.call("insert", (format!("{}: {}\n", project.key, project.name),))?;
+        current_buffer_button(env, &project.key, "jiroscope-project-button")?;
+        current_buffer_println(env, &format!(": {}", project.name))?;
 
         let mut issues = state
             .issues()

@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use super::User;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Project {
     // id is sometimes a string, sometimes a number.
@@ -9,6 +11,30 @@ pub struct Project {
     pub id: i64,
     pub key: String,
     pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProjectDetailed {
+    // id is sometimes a string, sometimes a number.
+    // if it's a string, parse to i64,
+    // if it's a number, parse to i64,
+    #[serde(deserialize_with = "crate::utils::deserialize_id")]
+    pub id: i64,
+    pub key: String,
+    pub name: String,
+    pub description: String,
+    pub lead: User,
+    pub url: Option<String>,
+}
+
+impl ProjectDetailed {
+    pub fn to_project(self) -> Project {
+        Project {
+            id: self.id,
+            key: self.key,
+            name: self.name,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -225,7 +251,7 @@ pub enum ProjectCreateDetails {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProjectEdit {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,

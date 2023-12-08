@@ -5,7 +5,7 @@ use jiroscope_core::jira::{
 };
 
 use crate::{
-    concurrent, get_jiroscope,
+    concurrent, get_jiroscope, project,
     state::{self, get_state, ConflictCell},
     utils::{
         self, close_jiroscope_diff_buffer, current_buffer_face_println, current_buffer_println,
@@ -83,24 +83,12 @@ fn prompt_issue_parent(env: &Env, project_key: &str) -> Option<i64> {
 fn create_interactive(env: &Env) -> Result<Value<'_>> {
     let mut jiroscope = get_jiroscope();
     let state = get_state();
-    let projects = state.projects();
 
     // let user choose project
-    let index = utils::prompt_select_index(
-        env,
-        "Choose which project to create the issue in: ",
-        projects
-            .iter()
-            .map(|p| p.name.clone())
-            .collect::<Vec<_>>()
-            .as_slice(),
-    );
-
-    if index.is_none() {
-        return utils::nil(env);
-    }
-
-    let project = projects[index.unwrap()].clone();
+    let project = match project::prompt_select_project(env) {
+        Some(p) => p,
+        None => return utils::nil(env),
+    };
     drop(state);
 
     // let user choose issue type
