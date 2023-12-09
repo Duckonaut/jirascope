@@ -346,6 +346,14 @@ fn edit_graphical_finish(env: &Env) -> Result<()> {
 
     let edited_project = get_jiroscope_buffer_content(env)?;
 
+    let og_key = match get_state().get_current_work_project() {
+        ConflictCell::Empty => return Ok(()),
+        ConflictCell::Armed { key } => key,
+        ConflictCell::Outdated { key, .. } => key,
+        ConflictCell::Deleted { key } => key,
+    }
+    .clone();
+
     // parse out project edit
     let key = edited_project
         .lines()
@@ -354,6 +362,11 @@ fn edit_graphical_finish(env: &Env) -> Result<()> {
         .trim_start_matches("* ")
         .trim_end_matches(" *")
         .to_string();
+
+    project_edit.key = match key.as_str() {
+        "" => None,
+        _ => Some(key.clone()),
+    };
 
     project_edit.name = edited_project
         .lines()
@@ -401,14 +414,14 @@ fn edit_graphical_finish(env: &Env) -> Result<()> {
     };
 
     workthread_spawn(move || {
-        if !get_state().try_return_project(&*key) {
+        if !get_state().try_return_project(og_key.as_str()) {
             concurrent::push_command(Box::new(move |env| {
                 env.message("Project changed since last access.")?;
 
                 display_old_and_changed(env)?;
 
                 if prompt_force_change(env, "Project changed since last access")? {
-                    let result = get_jiroscope().edit_project(&*key, project_edit);
+                    let result = get_jiroscope().edit_project(og_key.as_str(), project_edit);
 
                     state::get_state().return_project();
 
@@ -424,7 +437,7 @@ fn edit_graphical_finish(env: &Env) -> Result<()> {
             return;
         }
 
-        let result = get_jiroscope().edit_project(&*key, project_edit);
+        let result = get_jiroscope().edit_project(og_key.as_str(), project_edit);
 
         state::get_state().return_project();
 
