@@ -13,34 +13,42 @@
 (require 'jiroscope-dyn)
 
 (defun jiroscope-setup (url login api_token)
+  "Setup Jiroscope with the given cloud URL, login and API token."
   (jiroscope-dyn-setup url login api_token))
 
 ;; add bindings for interactive use
 (defun jiroscope-issue-create ()
+  "Create a new issue."
   (interactive)
   (jiroscope-dyn-issue-create-interactive))
 
 (defun jiroscope-issue-display ()
+  "Display an issue."
   (interactive)
   (jiroscope-dyn-issue-display-interactive))
 
 (defun jiroscope-issue-edit ()
+  "Edit an issue via prompts."
   (interactive)
   (jiroscope-dyn-issue-edit-interactive))
 
 (defun jiroscope-issue-edit-graphical ()
+  "Edit an issue in a buffer."
   (interactive)
   (jiroscope-dyn-issue-edit-graphical-interactive))
 
 (defun jiroscope-issue-edit-finish ()
+  "Finish editing an issue in a buffer and send it to the server."
   (interactive)
   (jiroscope-dyn-issue-edit-graphical-finish))
 
 (defun jiroscope-issue-delete ()
+  "Delete an issue."
   (interactive)
   (jiroscope-dyn-issue-delete-interactive))
 
 (defun jiroscope-issue-transition ()
+  "Transition an issue."
   (interactive)
   (jiroscope-dyn-issue-transition-interactive))
 
@@ -49,22 +57,27 @@
   (jiroscope-dyn-project-create-interactive))
 
 (defun jiroscope-project-edit ()
+  "Edit a project via prompts."
   (interactive)
   (jiroscope-dyn-project-edit-interactive))
 
 (defun jiroscope-project-edit-graphical ()
+  "Edit a project in a buffer."
   (interactive)
   (jiroscope-dyn-project-edit-graphical-interactive))
 
 (defun jiroscope-project-edit-finish ()
+  "Finish editing a project in a buffer and send it to the server."
   (interactive)
   (jiroscope-dyn-project-edit-graphical-finish))
 
 (defun jiroscope-project-delete ()
+  "Delete a project."
   (interactive)
   (jiroscope-dyn-project-delete-interactive))
 
 (defun jiroscope-tree-open()
+  "Open the project tree buffer."
   (interactive)
   (jiroscope-dyn-state-open))
 
