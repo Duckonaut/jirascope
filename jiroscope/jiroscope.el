@@ -28,7 +28,7 @@
 (require 'jiroscope-dyn)
 
 (defun jiroscope-setup (url login api_token)
-  "Setup Jiroscope with the given cloud URL, login and API token."
+  "Setup Jiroscope with the given cloud URL, LOGIN and API_TOKEN."
   (jiroscope-dyn-setup url login api_token))
 
 ;; add bindings for interactive use
@@ -43,7 +43,7 @@
   (jiroscope-dyn-issue-display-interactive))
 
 (defun jiroscope-issue-edit ()
-  "Edit an issue via prompts."
+  "Edit an issue via prompt."
   (interactive)
   (jiroscope-dyn-issue-edit-interactive))
 
@@ -68,11 +68,12 @@
   (jiroscope-dyn-issue-transition-interactive))
 
 (defun jiroscope-project-create ()
+  "Create a project via prompt."
   (interactive)
   (jiroscope-dyn-project-create-interactive))
 
 (defun jiroscope-project-edit ()
-  "Edit a project via prompts."
+  "Edit a project via prompt."
   (interactive)
   (jiroscope-dyn-project-edit-interactive))
 
@@ -130,6 +131,7 @@
     'action 'jiroscope-dyn-project-button-action)
 
 (defun jiroscope-insert-button (text ty)
+  "Used by jiroscope-dyn. Create a button with the given TEXT and type TY in the current buffer."
   (insert-button text
     :type ty))
 
