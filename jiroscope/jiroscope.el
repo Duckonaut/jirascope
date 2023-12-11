@@ -1,17 +1,20 @@
 ;;; jiroscope.el --- Core Jiroscope APIs -*- lexical-binding: t; coding: utf-8 -*-
 
-;;; Author: Stanisław Zagórowski <duckonaut@gmail.com>
-;;; Version: 0.1.1
-;;; Keywords: tools
-;;; URL: https://github.com/Duckonaut/jiroscope
-;;; Package-Requires: ((emacs "24.4"))
+;; SPDX-License-Identifier: MIT OR Apache-2.0
+;; Author: Stanisław Zagórowski <duckonaut@gmail.com>
+;; Version: 0.1.1
+;; Keywords: tools
+;; URL: https://github.com/Duckonaut/jiroscope
+;; Package-Requires: ((emacs "25.1"))
 
 ;;; Commentary:
-;;; Jiroscope is a package integrating Jira Cloud into Emacs, allowing you to operate on projects and issues
-;;; through either prompt-based interactive commands, or special buffers.
+;; Jiroscope is a package integrating Jira Cloud into Emacs,
+;; allowing you to operate on projects and issues through either
+;; prompt-based interactive commands, or special buffers.
 
-;;; Core functionality is implemented in Rust. The Rust portion is distributed via github (automatically
-;;; downloaded as needed) and loaded as a dynamic Emacs module
+;; Core functionality is implemented in Rust. The Rust portion is
+;; distributed via github (automatically downloaded as needed)
+;; and loaded as a dynamic Emacs module
 
 ;;; Code:
 

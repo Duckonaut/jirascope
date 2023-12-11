@@ -1,9 +1,10 @@
 ;;; jiroscope-dyn-get.el --- Utilities to obtain jiroscope-dyn -*- lexical-binding: t; coding: utf-8 -*-
 
-;;; Based heavily on:
-;;; https://github.com/emacs-tree-sitter/elisp-tree-sitter/blob/master/core/tsc-dyn-get.el
+;; SPDX-License-Identifier: MIT OR Apache-2.0
 
 ;;; Commentary:
+;; Based heavily on:
+;; https://github.com/emacs-tree-sitter/elisp-tree-sitter/blob/master/core/tsc-dyn-get.el
 
 ;; This file contains the utilities to obtain the dynamic module `jiroscope-dyn', by
 ;; either downloading pre-built binaries or building from source.
@@ -29,7 +30,8 @@
   "The directory where the library `jiroscope' is located.")
 
 (defgroup jiroscope nil
-  "Core jiroscope APIs.")
+  "Core jiroscope APIs."
+  :group 'jiroscope)
 
 (defcustom jiroscope-dyn-dir jiroscope--dir
   "The directory that `jiroscope-dyn' module is resided.
@@ -48,8 +50,8 @@ For pre-built binaries, it attempts to download the requested version.
 For local compilation, the Rust toolchain is required.
 
 If you want to manually get the dynamic module through another mechanism,
-instead of letting `jiroscope-dyn-get' automatically try to download/build it, set
-this to nil."
+instead of letting `jiroscope-dyn-get' automatically try to download/build it,
+set this to nil."
   :group 'jiroscope
   :type '(set (const :tag "Binary from GitHub" :github)
               (const :tag "Local Compilation" :compilation)))
@@ -86,14 +88,18 @@ this to nil."
      "jiroscope-dyn.x86_64-unknown-linux-gnu.so")))
 
 (defun jiroscope-dyn-get--log (format-string &rest args)
+  "Log a message to the `jiroscope-dyn-get' logger.
+FORMAT-STRING and ARGS are passed to `message'."
   (apply #'message (concat "jiroscope-dyn-get: " format-string) args))
 
 (defun jiroscope-dyn-get--warn (&rest args)
+  "Log a warning to the `jiroscope-dyn-get' logger.
+ARGS are passed to `format'."
   (display-warning 'jiroscope-dyn-get (apply #'format args) :emergency))
 
 (defun jiroscope-dyn-get--recorded-version ()
-  "Return the `jiroscope-dyn' version recorded in the manifest
-`jiroscope-dyn-get--version-file'."
+  "Return the `jiroscope-dyn' version recorded.
+The information is stored in the file `jiroscope-dyn-get--version-file'."
   (let ((default-directory (jiroscope-dyn-get--dir)))
     (when (file-exists-p jiroscope-dyn-get--version-file)
       (with-temp-buffer
@@ -105,17 +111,19 @@ this to nil."
   "Return the currently loaded version of `jiroscope-dyn'."
   (and (featurep 'jiroscope-dyn) (bound-and-true-p jiroscope-dyn--version)))
 
-;;; ----------------------------------------------------------------------------
-;;; Pre-built binaries downloaded through HTTP.
+;; ----------------------------------------------------------------------------
+;; Pre-built binaries downloaded through HTTP.
 
 (defun jiroscope-dyn-get--check-http (&rest _args)
+  "Check the HTTP status code of the current `url-copy-file' request."
   (when-let ((status (bound-and-true-p url-http-response-status)))
     (when (>= status 400)
       (error "Got HTTP status code %s" status))))
 
 ;; TODO: Find a better way to make `url-copy-file' handle bad HTTP status codes.
 (defun jiroscope-dyn-get--url-copy-file (&rest args)
-  "A wrapper around `url-copy-file' that signals errors for bad HTTP statuses."
+  "A wrapper around `url-copy-file' that signals errors for bad HTTP statuses.
+ARGS are passed to `url-copy-file'."
   (advice-add 'mm-dissect-buffer :before #'jiroscope-dyn-get--check-http)
   (unwind-protect
       (apply #'url-copy-file args)
@@ -130,20 +138,24 @@ This function records the downloaded version in the manifest
          (_ (unless (file-directory-p bin-dir) (make-directory bin-dir)))
          (local-name (jiroscope-dyn-get--file))
          (remote-name local-name)
-         (url (format "https://github.com/duckonaut/jiroscope/releases/download/v%s/%s"
-                      version remote-name)))
+         (url (format
+                "https://github.com/Duckonaut/jiroscope/releases/download/v%s/%s"               version
+                remote-name)))
     (jiroscope-dyn-get--log "Downloading %s" url)
     (jiroscope-dyn-get--url-copy-file url local-name :ok-if-already-exists)
     (with-temp-file jiroscope-dyn-get--version-file
       (let ((coding-system-for-write 'utf-8))
         (insert version)))))
 
-;;; ----------------------------------------------------------------------------
-;;; Local compilation.
+;; ----------------------------------------------------------------------------
+;; Local compilation.
 
 (define-error 'jiroscope-compile-error "Could not compile `jiroscope-dyn'")
 
 (defun jiroscope-dyn-get--build-output (face &rest args)
+  "Print a message to the `jiroscope-dyn-get' logger.
+Message is printed with FACE, which is passed to `propertize'.
+ARGS are passed to `format'."
   (declare (indent 1))
   (let ((str (propertize (apply #'format args) 'face face 'font-lock-face face))
         (inhibit-read-only t))
@@ -153,19 +165,21 @@ This function records the downloaded version in the manifest
       (insert "\n"))))
 
 (defmacro jiroscope-dyn-get--compilation-to-stdout (condition &rest body)
-  "Eval BODY forms with compilation output conditionally redirected to `princ'."
+  "Eval BODY forms with compilation output conditionally redirected to `princ'.
+If CONDITION is true, redirect compilation output to `princ' instead of the
+compilation buffer. Otherwise, eval BODY forms normally."
   (declare (indent 1))
   (let ((print-stdout (make-symbol "print-stdout")))
     `(if ,condition
          (let ((,print-stdout (lambda (_proc string) (princ string))))
-           (advice-add 'compilation-filter :override ,print-stdout)
+           (advice-add 'compilation-filter :override #',print-stdout)
            (unwind-protect
                (progn ,@body)
-             (advice-remove 'compilation-filter ,print-stdout)))
+             (advice-remove 'compilation-filter #',print-stdout)))
        ,@body)))
 
 (defun jiroscope-dyn-get--build-version ()
-  "Return the dynamic module's version after asking 'cargo'."
+  "Return the dynamic module's version after asking `cargo'."
   (thread-first (shell-command-to-string "cargo pkgid")
     string-trim
     (split-string "\[#:\]")
@@ -183,7 +197,9 @@ This function records the downloaded version in the manifest
   "Clean up after compiling the dynamic module `jiroscope-dyn'.
 This function copies the built binary to the appropriate location, delete the
 build directory, and record the built version in the manifest
-`jiroscope-dyn-get--version-file'."
+`jiroscope-dyn-get--version-file'.
+COMP-BUFFER is the compilation buffer. STATUS is the exit status of the
+compilation process."
   (with-current-buffer comp-buffer
     (let* ((file (jiroscope-dyn-get--file))
            (out-name (jiroscope-dyn-get--out-file))
@@ -254,25 +270,28 @@ build directory, and record the built version in the manifest
 (defun jiroscope-dyn-get--build (&optional dir)
   "Build the dynamic module `jiroscope-dyn' from source.
 
-When called during an attempt to load `jiroscope', or in batch mode, this blocks until
-compilation finishes. In other situations, it runs in the background.
+If DIR is nil, use `jiroscope-dyn-get--dir'.
+Otherwise, use DIR as the build directory.
+
+When called during an attempt to load `jiroscope', or in batch mode,
+this blocks until compilation finishes. In other situations, it runs
+in the background.
 
 This function records the built version in the manifest
 `jiroscope-dyn-get--version-file'.
 
-On Windows, if `jiroscope-dyn' has already been loaded, compilation will fail because
-the OS doesn't allow overwriting opened dynamically-loaded libraries."
+On Windows, if `jiroscope-dyn' has already been loaded, compilation will fail
+because the OS doesn't allow overwriting opened dynamically-loaded libraries."
   (unless dir (setq dir jiroscope--dir))
   (while (not (executable-find "cargo"))
     (if noninteractive
         (signal 'jiroscope-compile-error "Could not find `cargo' executable")
       ;; TODO: Make a better prompt.
-      (unless (y-or-n-p
-               (format "Could not find `cargo' executable.
-Please press '%s' after installing the Rust toolchain (e.g. from https://rustup.rs/).
-Press '%s' to cancel. "
-                       (propertize "y" 'face 'bold)
-                       (propertize "n" 'face 'error)))
+      (unless
+        (y-or-n-p
+          "Could not find `cargo' executable.
+Do you want to install the rust toolchain?")
+
         (signal 'jiroscope-compile-error "Compilation was cancelled"))))
   (if (or noninteractive
           (not (featurep 'jiroscope-dyn))
@@ -283,8 +302,8 @@ Press '%s' to cancel. "
     ;; to be able to load the newly built `jiroscope-dyn'.
     (jiroscope-dyn-get--build-async dir)))
 
-;;; ----------------------------------------------------------------------------
-;;; Generic mechanism.
+;; ----------------------------------------------------------------------------
+;; Generic mechanism.
 
 (defun jiroscope--module-load-noerror (file)
   "Try loading `jiroscope-dyn' from FILE.
@@ -338,8 +357,8 @@ Return t on success, nil otherwise."
 If this function cannot find a suitable version on `load-path', it tries to get
 the dynamic module from sources listed in `jiroscope-dyn-get-from'.
 
-NOTE: Emacs cannot unload dynamic modules, so if `jiroscope-dyn' was already loaded,
-you will need to restart Emacs to load the new version."
+NOTE: Emacs cannot unload dynamic modules, so if `jiroscope-dyn' was already
+loaded, you will need to restart Emacs to load the new version."
   (let* ((default-directory (jiroscope-dyn-get--dir))
          (recorded (jiroscope-dyn-get--recorded-version))
          (loaded (jiroscope-dyn-get--loaded-version))
