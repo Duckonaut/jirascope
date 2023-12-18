@@ -4,7 +4,7 @@ use crate::jira;
 
 #[derive(Debug)]
 pub enum Error {
-    Jiroscope { message: String },
+    Jirascope { message: String },
     Auth { message: String },
     Io(std::io::Error),
     Ureq(Box<ureq::Error>), // ureq::Error is Big
@@ -12,8 +12,8 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn jiroscope(message: impl Into<String>) -> Error {
-        Error::Jiroscope {
+    pub fn jirascope(message: impl Into<String>) -> Error {
+        Error::Jirascope {
             message: message.into(),
         }
     }
@@ -40,7 +40,7 @@ impl From<ureq::Error> for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Jiroscope { message } => write!(f, "Jiroscope error: {}", message),
+            Error::Jirascope { message } => write!(f, "Jirascope error: {}", message),
             Error::Auth { message } => write!(f, "Auth error: {}", message),
             Error::Io(e) => write!(f, "IO error: {}", e),
             Error::Ureq(e) => write!(f, "Ureq error: {}", e),

@@ -1,12 +1,12 @@
 use std::io::Read;
 
 use clap::Parser;
-use jiroscope_core::jira::{AtlassianDoc, IssueEdit};
+use jirascope_core::jira::{AtlassianDoc, IssueEdit};
 
 #[derive(Debug, Clone, Parser)]
 #[clap(version = "1.0", author = "Stanisław Zagórowski")]
 struct Args {
-    #[clap(short, long, help = "jiroscope auth_config.toml file")]
+    #[clap(short, long, help = "jirascope auth_config.toml file")]
     identity: Option<String>,
     #[clap(short, long, help = "Jira server url")]
     server: Option<String>,
@@ -104,20 +104,20 @@ fn main() {
         std::process::exit(1);
     }
 
-    let config = jiroscope_core::Config::new(server.unwrap());
-    let auth = jiroscope_core::Auth::new(user.unwrap(), api_token.unwrap());
+    let config = jirascope_core::Config::new(server.unwrap());
+    let auth = jirascope_core::Auth::new(user.unwrap(), api_token.unwrap());
 
-    let mut jiroscope = jiroscope_core::Jiroscope::new(config, auth);
-    jiroscope.init().unwrap();
+    let mut jirascope = jirascope_core::Jirascope::new(config, auth);
+    jirascope.init().unwrap();
 
     match subcommand {
         Subcommand::All => {
-            let issues = handle_error(jiroscope.get_all_issues());
+            let issues = handle_error(jirascope.get_all_issues());
             println!("{:#?}", issues);
         }
         Subcommand::Issue { board_id, issue_id } => {
             let issue =
-                handle_error(jiroscope.get_issue(format!("{}-{}", board_id, issue_id).as_str()));
+                handle_error(jirascope.get_issue(format!("{}-{}", board_id, issue_id).as_str()));
             println!("{:#?}", issue);
         }
         Subcommand::Edit {
@@ -136,45 +136,45 @@ fn main() {
             // TODO: rest of the fields
 
             handle_error(
-                jiroscope.edit_issue(format!("{}-{}", board_id, issue_id).as_str(), issue_edit),
+                jirascope.edit_issue(format!("{}-{}", board_id, issue_id).as_str(), issue_edit),
             );
         }
         Subcommand::CreateMeta => {
-            let meta = handle_error(jiroscope.get_issue_creation_meta());
+            let meta = handle_error(jirascope.get_issue_creation_meta());
             println!("{:#?}", meta);
         }
         Subcommand::EditMeta { board_id, issue_id } => {
             let meta = handle_error(
-                jiroscope.get_issue_edit_meta(format!("{}-{}", board_id, issue_id).as_str()),
+                jirascope.get_issue_edit_meta(format!("{}-{}", board_id, issue_id).as_str()),
             );
             println!("{:#?}", meta);
         }
         Subcommand::Events => {
-            let events = jiroscope.get_issue_events().unwrap();
+            let events = jirascope.get_issue_events().unwrap();
             println!("{:#?}", events);
         }
         Subcommand::Delete { board_id, issue_id } => {
-            handle_error(jiroscope.delete_issue(format!("{}-{}", board_id, issue_id).as_str()));
+            handle_error(jirascope.delete_issue(format!("{}-{}", board_id, issue_id).as_str()));
         }
     }
 }
 
-fn handle_error<T>(result: Result<T, jiroscope_core::Error>) -> T {
+fn handle_error<T>(result: Result<T, jirascope_core::Error>) -> T {
     match result {
         Ok(t) => t,
         Err(e) => {
             match e {
-                jiroscope_core::Error::Jiroscope { message } => {
+                jirascope_core::Error::Jirascope { message } => {
                     eprintln!("Error: {}", message);
                 }
-                jiroscope_core::Error::Auth { message } => {
+                jirascope_core::Error::Auth { message } => {
                     eprintln!("Error: {}", message);
                 }
-                jiroscope_core::Error::Io(e) => {
+                jirascope_core::Error::Io(e) => {
                     eprintln!("Error: {}", e);
                 }
-                jiroscope_core::Error::Ureq(e) => match *e {
-                    jiroscope_core::ureq::Error::Status(code, response) => {
+                jirascope_core::Error::Ureq(e) => match *e {
+                    jirascope_core::ureq::Error::Status(code, response) => {
                         eprintln!("Error: {} {}", code, response.status_text());
                         eprintln!("{}", response.into_string().unwrap());
                     }
@@ -182,7 +182,7 @@ fn handle_error<T>(result: Result<T, jiroscope_core::Error>) -> T {
                         eprintln!("Error: {}", e);
                     }
                 },
-                jiroscope_core::Error::Jira(code, e) => {
+                jirascope_core::Error::Jira(code, e) => {
                     eprintln!("Error {}: {}", code, e);
                 }
             }

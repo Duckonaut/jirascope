@@ -1,5 +1,5 @@
 [package]
-name = "jiroscope-cli"
+name = "jirascope-cli"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.1.11", features = ["derive"] }
-jiroscope-core = { path = "../jiroscope-core" }
+jirascope-core = { path = "../jirascope-core" }
 toml = "0.7.6"

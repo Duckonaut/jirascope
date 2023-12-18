@@ -20,7 +20,7 @@ pub use ureq;
 
 use crate::jira::{FieldConfigurationScheme, Issue};
 
-pub struct Jiroscope {
+pub struct Jirascope {
     config: Config,
     pub auth: Auth,
 }
@@ -32,9 +32,9 @@ pub struct Note {
     pub message: String,
 }
 
-impl Jiroscope {
-    pub fn new(config: Config, auth: Auth) -> Jiroscope {
-        Jiroscope { config, auth }
+impl Jirascope {
+    pub fn new(config: Config, auth: Auth) -> Jirascope {
+        Jirascope { config, auth }
     }
 
     pub fn init(&mut self) -> Result<(), crate::Error> {

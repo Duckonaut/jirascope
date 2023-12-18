@@ -1,12 +1,12 @@
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use emacs::{defun, Env};
-use jiroscope_core::jira::{Issue, Project, ProjectDetailed};
+use jirascope_core::jira::{Issue, Project, ProjectDetailed};
 
 use crate::{
-    concurrent, get_jiroscope,
+    concurrent, get_jirascope,
     utils::{self, current_buffer_button, current_buffer_print, current_buffer_println},
-    JIROSCOPE_BUFFER_NAME,
+    JIRASCOPE_BUFFER_NAME,
 };
 
 static STATE: OnceLock<Mutex<State>> = OnceLock::new();
@@ -98,25 +98,25 @@ impl State {
         &self.issue_rentcell
     }
 
-    pub fn check_out_issue(&mut self, issue_key: String) -> Result<(), jiroscope_core::Error> {
+    pub fn check_out_issue(&mut self, issue_key: String) -> Result<(), jirascope_core::Error> {
         match self.issue_rentcell {
             ConflictCell::Empty => {
                 self.issue_rentcell = ConflictCell::Armed { key: issue_key };
                 Ok(())
             }
-            _ => Err(jiroscope_core::Error::jiroscope(
+            _ => Err(jirascope_core::Error::jirascope(
                 "Issue already checked out.",
             )),
         }
     }
 
-    pub fn check_out_project(&mut self, project_key: String) -> Result<(), jiroscope_core::Error> {
+    pub fn check_out_project(&mut self, project_key: String) -> Result<(), jirascope_core::Error> {
         match self.project_rentcell {
             ConflictCell::Empty => {
                 self.project_rentcell = ConflictCell::Armed { key: project_key };
                 Ok(())
             }
-            _ => Err(jiroscope_core::Error::jiroscope(
+            _ => Err(jirascope_core::Error::jirascope(
                 "Project already checked out.",
             )),
         }
@@ -150,8 +150,8 @@ impl State {
         self.project_rentcell = ConflictCell::Empty;
     }
 
-    pub fn refresh(&mut self) -> Result<(), jiroscope_core::Error> {
-        let new_projects = get_jiroscope().get_projects()?;
+    pub fn refresh(&mut self) -> Result<(), jirascope_core::Error> {
+        let new_projects = get_jirascope().get_projects()?;
 
         if !new_projects.iter().eq(self.projects.iter()) {
             self.dirty = true;
@@ -174,7 +174,7 @@ impl State {
 
         self.projects = new_projects;
 
-        let new_issues = get_jiroscope()
+        let new_issues = get_jirascope()
             .get_all_issues()
             .map(|issues| issues.issues)?;
 
@@ -230,7 +230,7 @@ pub(crate) fn setup(refresh_interval: f64) {
     });
 }
 
-pub(crate) fn refresh(env: &Env) -> Result<(), jiroscope_core::Error> {
+pub(crate) fn refresh(env: &Env) -> Result<(), jirascope_core::Error> {
     let mut state = get_state();
     match state.refresh() {
         Ok(_) => {
@@ -244,8 +244,8 @@ pub(crate) fn refresh(env: &Env) -> Result<(), jiroscope_core::Error> {
 }
 
 fn update_buffers(env: &Env, state: &State) {
-    if let Some(utils::JiroscopeBufferMode::Tree) = utils::get_buffer_mode() {
-        utils::with_buffer(env, JIROSCOPE_BUFFER_NAME, |env| {
+    if let Some(utils::JirascopeBufferMode::Tree) = utils::get_buffer_mode() {
+        utils::with_buffer(env, JIRASCOPE_BUFFER_NAME, |env| {
             env.call("erase-buffer", [])?;
 
             print_tree(env, state)?;
@@ -260,8 +260,8 @@ fn update_buffers(env: &Env, state: &State) {
 pub fn open(env: &emacs::Env) -> emacs::Result<()> {
     let state = get_state();
 
-    utils::set_buffer_mode(env, utils::JiroscopeBufferMode::Tree)?;
-    utils::open_jiroscope_buffer(env)?;
+    utils::set_buffer_mode(env, utils::JirascopeBufferMode::Tree)?;
+    utils::open_jirascope_buffer(env)?;
 
     env.call("erase-buffer", [])?;
 
@@ -280,7 +280,7 @@ fn get_icon(i: usize, len: usize) -> &'static str {
 
 fn print_tree(env: &emacs::Env, state: &State) -> emacs::Result<()> {
     for project in state.projects() {
-        current_buffer_button(env, &project.key, "jiroscope-project-button")?;
+        current_buffer_button(env, &project.key, "jirascope-project-button")?;
         current_buffer_println(env, &format!(": {}", project.name))?;
 
         let mut issues = state
@@ -303,7 +303,7 @@ fn print_tree(env: &emacs::Env, state: &State) -> emacs::Result<()> {
         for (i, issue) in issues.iter().enumerate() {
             current_buffer_print(env, &format!("{} ", get_icon(i, size)))?;
 
-            current_buffer_button(env, &issue.key, "jiroscope-issue-button")?;
+            current_buffer_button(env, &issue.key, "jirascope-issue-button")?;
             current_buffer_println(
                 env,
                 &format!(": {} - {}", issue.fields.summary, issue.fields.status.name),
@@ -319,7 +319,7 @@ fn print_tree(env: &emacs::Env, state: &State) -> emacs::Result<()> {
             for (i, subtask) in issue_subtasks.iter().enumerate() {
                 current_buffer_print(env, &format!("  {} ", get_icon(i, subtask_size)))?;
 
-                current_buffer_button(env, &subtask.key, "jiroscope-issue-button")?;
+                current_buffer_button(env, &subtask.key, "jirascope-issue-button")?;
                 current_buffer_println(
                     env,
                     &format!(

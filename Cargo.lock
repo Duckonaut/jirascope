@@ -477,16 +477,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "453ad9f582a441959e5f0d088b02ce04cfe8d51a8eaf077f12ac6d3e94164ca6"
 
 [[package]]
-name = "jiroscope-cli"
+name = "jirascope-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
- "jiroscope-core",
+ "jirascope-core",
  "toml",
 ]
 
 [[package]]
-name = "jiroscope-core"
+name = "jirascope-core"
 version = "0.1.0"
 dependencies = [
  "base64 0.21.0",
@@ -496,17 +496,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "jiroscope-dyn"
+name = "jirascope-dyn"
 version = "0.1.2"
 dependencies = [
  "emacs",
- "jiroscope-core",
+ "jirascope-core",
  "serde",
  "serde_json",
 ]
 
 [[package]]
-name = "jiroscope-test-server"
+name = "jirascope-test-server"
 version = "0.1.0"
 dependencies = [
  "axum",

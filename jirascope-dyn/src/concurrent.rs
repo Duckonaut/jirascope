@@ -65,7 +65,7 @@ pub(crate) fn flush_commands(env: &Env) -> emacs::Result<()> {
 #[defun]
 fn event_handler(env: &Env) -> emacs::Result<()> {
     if utils::workthread_count() > 0 {
-        env.message("[jiroscope] Task running...")?;
+        env.message("[jirascope] Task running...")?;
     }
 
     flush_commands(env)
@@ -78,7 +78,7 @@ pub(crate) fn install_handler(env: &Env) -> emacs::Result<Value<'_>> {
         [
             0.1.into_lisp(env)?,
             0.1.into_lisp(env)?,
-            env.intern("jiroscope-dyn-concurrent-event-handler")?,
+            env.intern("jirascope-dyn-concurrent-event-handler")?,
         ],
     )
 }

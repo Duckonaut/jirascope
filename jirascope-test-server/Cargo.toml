@@ -1,5 +1,5 @@
 [package]
-name = "jiroscope-test-server"
+name = "jirascope-test-server"
 version = "0.1.0"
 edition = "2021"
 

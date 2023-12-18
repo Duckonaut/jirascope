@@ -1,7 +1,7 @@
 use emacs::{Env, IntoLisp, Result, Value};
 use serde::{Deserialize, Serialize};
 
-use crate::{utils::{write_tuples_to_md_table, write_tuples_to_pyplot_data}, get_jiroscope};
+use crate::{utils::{write_tuples_to_md_table, write_tuples_to_pyplot_data}, get_jirascope};
 
 const BENCHMARK_ITERATIONS: usize = 100;
 
@@ -22,7 +22,7 @@ fn full_data_buffer_benchmark(env: &Env) -> Result<Value> {
         let timer_a = std::time::Instant::now();
         for _ in 0..BENCHMARK_ITERATIONS {
             let _ = env.call(
-                "jiroscope-benchmark-rust-lisp-untouched",
+                "jirascope-benchmark-rust-lisp-untouched",
                 [inc.into_lisp(env)?],
             )?;
         }
@@ -33,7 +33,7 @@ fn full_data_buffer_benchmark(env: &Env) -> Result<Value> {
         let timer_b = std::time::Instant::now();
         for _ in 0..BENCHMARK_ITERATIONS {
             let _ = env.call(
-                "jiroscope-benchmark-lisp-rust-untouched",
+                "jirascope-benchmark-lisp-rust-untouched",
                 [inc.into_lisp(env)?],
             )?;
         }
@@ -44,7 +44,7 @@ fn full_data_buffer_benchmark(env: &Env) -> Result<Value> {
         let timer_c = std::time::Instant::now();
         for _ in 0..BENCHMARK_ITERATIONS {
             let _ = env.call(
-                "jiroscope-benchmark-rust-lisp-touched",
+                "jirascope-benchmark-rust-lisp-touched",
                 [inc.into_lisp(env)?],
             )?;
         }
@@ -55,7 +55,7 @@ fn full_data_buffer_benchmark(env: &Env) -> Result<Value> {
         let timer_d = std::time::Instant::now();
         for _ in 0..BENCHMARK_ITERATIONS {
             let _ = env.call(
-                "jiroscope-benchmark-lisp-rust-touched",
+                "jirascope-benchmark-lisp-rust-touched",
                 [inc.into_lisp(env)?],
             )?;
         }
@@ -66,7 +66,7 @@ fn full_data_buffer_benchmark(env: &Env) -> Result<Value> {
         let timer_e = std::time::Instant::now();
         for _ in 0..BENCHMARK_ITERATIONS {
             let _ = env.call(
-                "jiroscope-benchmark-rust-back-and-forth",
+                "jirascope-benchmark-rust-back-and-forth",
                 [inc.into_lisp(env)?],
             )?;
         }
@@ -77,7 +77,7 @@ fn full_data_buffer_benchmark(env: &Env) -> Result<Value> {
         let timer_f = std::time::Instant::now();
         for _ in 0..BENCHMARK_ITERATIONS {
             let _ = env.call(
-                "jiroscope-benchmark-rust-normal-call",
+                "jirascope-benchmark-rust-normal-call",
                 [inc.into_lisp(env)?],
             )?;
         }
@@ -98,7 +98,7 @@ fn full_data_buffer_benchmark(env: &Env) -> Result<Value> {
         ));
     }
 
-    let mut file = std::fs::File::create("jiroscope-benchmark.md")?;
+    let mut file = std::fs::File::create("jirascope-benchmark.md")?;
 
     write_tuples_to_md_table(
         &mut file,
@@ -114,7 +114,7 @@ fn full_data_buffer_benchmark(env: &Env) -> Result<Value> {
         &rows_verbose,
     )?;
 
-    let mut file = std::fs::File::create("jiroscope-benchmark-data.py")?;
+    let mut file = std::fs::File::create("jirascope-benchmark-data.py")?;
 
     write_tuples_to_pyplot_data(
         &mut file,
@@ -136,7 +136,7 @@ fn full_data_buffer_benchmark(env: &Env) -> Result<Value> {
 #[emacs::defun]
 fn full_json_benchmark(env: &Env) -> Result<Value> {
     let depths = &[1, 2, 4, 6, 8, 10];
-    let mut file = std::fs::File::create("jiroscope-benchmark.md")?;
+    let mut file = std::fs::File::create("jirascope-benchmark.md")?;
     let mut rows_verbose = vec![];
     let mut rows_micro = vec![];
 
@@ -146,7 +146,7 @@ fn full_json_benchmark(env: &Env) -> Result<Value> {
         let timer_a = std::time::Instant::now();
         for _ in 0..BENCHMARK_ITERATIONS {
             let _ = env.call(
-                "jiroscope-benchmark-rust-deserialize-json-no-navigate",
+                "jirascope-benchmark-rust-deserialize-json-no-navigate",
                 [json.clone().into_lisp(env)?],
             )?;
         }
@@ -157,7 +157,7 @@ fn full_json_benchmark(env: &Env) -> Result<Value> {
         let timer_b = std::time::Instant::now();
         for _ in 0..BENCHMARK_ITERATIONS {
             let _ = env.call(
-                "jiroscope-benchmark-lisp-deserialize-json-no-navigate",
+                "jirascope-benchmark-lisp-deserialize-json-no-navigate",
                 [json.clone().into_lisp(env)?],
             )?;
         }
@@ -168,7 +168,7 @@ fn full_json_benchmark(env: &Env) -> Result<Value> {
         let timer_c = std::time::Instant::now();
         for _ in 0..BENCHMARK_ITERATIONS {
             let _ = env.call(
-                "jiroscope-benchmark-rust-deserialize-json",
+                "jirascope-benchmark-rust-deserialize-json",
                 [json.clone().into_lisp(env)?],
             )?;
         }
@@ -179,7 +179,7 @@ fn full_json_benchmark(env: &Env) -> Result<Value> {
         let timer_d = std::time::Instant::now();
         for _ in 0..BENCHMARK_ITERATIONS {
             let _ = env.call(
-                "jiroscope-benchmark-lisp-deserialize-json",
+                "jirascope-benchmark-lisp-deserialize-json",
                 [json.clone().into_lisp(env)?],
             )?;
         }
@@ -209,7 +209,7 @@ fn full_json_benchmark(env: &Env) -> Result<Value> {
         &rows_verbose,
     )?;
 
-    let mut file = std::fs::File::create("jiroscope-benchmark-plot-data.py")?;
+    let mut file = std::fs::File::create("jirascope-benchmark-plot-data.py")?;
     write_tuples_to_pyplot_data(
         &mut file,
         &[
@@ -232,44 +232,44 @@ fn issues(env: &Env) -> Result<Value<'_>> {
 
     let time = std::time::Instant::now();
     for _ in 0..100 {
-        get_jiroscope().get_all_issues()?;
+        get_jirascope().get_all_issues()?;
     }
     let elapsed = time.elapsed();
     rows_verbose.push(("Rust", "ureq", format!("{:?}", elapsed)));
     rows_micro.push(("Rust, ureq", elapsed.as_micros()));
 
     let args = vec![
-        "https://jiroscope-testing.atlassian.net/rest/api/3/search"
+        "https://jirascope-testing.atlassian.net/rest/api/3/search"
             .to_string()
             .into_lisp(env)?,
-        get_jiroscope().auth.get_basic_auth().into_lisp(env)?,
+        get_jirascope().auth.get_basic_auth().into_lisp(env)?,
     ];
 
     let time = std::time::Instant::now();
     for _ in 0..100 {
-        env.call("jiroscope-auth-benchmark-request-el", &args)?;
+        env.call("jirascope-auth-benchmark-request-el", &args)?;
     }
     let elapsed = time.elapsed();
     rows_verbose.push(("Rust", "request.el", format!("{:?}", elapsed)));
     rows_micro.push(("Rust, request.el", elapsed.as_micros()));
 
     let time = std::time::Instant::now();
-    env.call("jiroscope-auth-benchmark-request-el-full", &args)?;
+    env.call("jirascope-auth-benchmark-request-el-full", &args)?;
     let elapsed = time.elapsed();
     rows_verbose.push(("ELisp", "request.el", format!("{:?}", elapsed)));
     rows_micro.push(("ELisp, request.el", elapsed.as_micros()));
 
     let time = std::time::Instant::now();
-    env.call("jiroscope-auth-benchmark-ureq-full", [])?;
+    env.call("jirascope-auth-benchmark-ureq-full", [])?;
     let elapsed = time.elapsed();
     rows_verbose.push(("ELisp", "ureq", format!("{:?}", elapsed)));
     rows_micro.push(("ELisp, ureq", elapsed.as_micros()));
 
-    let mut file = std::fs::File::create("jiroscope-auth-benchmark.md")?;
+    let mut file = std::fs::File::create("jirascope-auth-benchmark.md")?;
 
     write_tuples_to_md_table(&mut file, &["Caller", "Backend", "Time"], &rows_verbose)?;
 
-    let mut file = std::fs::File::create("jiroscope-auth-benchmark-micro-data.py")?;
+    let mut file = std::fs::File::create("jirascope-auth-benchmark-micro-data.py")?;
 
     write_tuples_to_pyplot_data(&mut file, &["Caller", "Time"], &rows_micro)?;
 
@@ -284,7 +284,7 @@ fn test_server(env: &Env) -> Result<Value<'_>> {
 
     let time = std::time::Instant::now();
     for _ in 0..100 {
-        get_jiroscope().get_notes()?;
+        get_jirascope().get_notes()?;
     }
     let elapsed = time.elapsed();
     rows_verbose.push(("Rust", "ureq", format!("{:?}", elapsed)));
@@ -295,29 +295,29 @@ fn test_server(env: &Env) -> Result<Value<'_>> {
 
     let time = std::time::Instant::now();
     for _ in 0..100 {
-        env.call("jiroscope-benchmark-request-el", &args)?;
+        env.call("jirascope-benchmark-request-el", &args)?;
     }
     let elapsed = time.elapsed();
     rows_verbose.push(("Rust", "request.el", format!("{:?}", elapsed)));
     rows_micro.push(("Rust, request.el", elapsed.as_micros()));
 
     let time = std::time::Instant::now();
-    env.call("jiroscope-benchmark-request-el-full", &args)?;
+    env.call("jirascope-benchmark-request-el-full", &args)?;
     let elapsed = time.elapsed();
     rows_verbose.push(("ELisp", "request.el", format!("{:?}", elapsed)));
     rows_micro.push(("ELisp, request.el", elapsed.as_micros()));
 
     let time = std::time::Instant::now();
-    env.call("jiroscope-benchmark-ureq-full", &args)?;
+    env.call("jirascope-benchmark-ureq-full", &args)?;
     let elapsed = time.elapsed();
     rows_verbose.push(("ELisp", "ureq", format!("{:?}", elapsed)));
     rows_micro.push(("ELisp, ureq", elapsed.as_micros()));
 
-    let mut file = std::fs::File::create("jiroscope-benchmark.md")?;
+    let mut file = std::fs::File::create("jirascope-benchmark.md")?;
 
     write_tuples_to_md_table(&mut file, &["Caller", "Backend", "Time"], &rows_verbose)?;
 
-    let mut file = std::fs::File::create("jiroscope-benchmark-micro-data.py")?;
+    let mut file = std::fs::File::create("jirascope-benchmark-micro-data.py")?;
 
     write_tuples_to_pyplot_data(&mut file, &["Caller", "Time"], &rows_micro)?;
 
@@ -371,7 +371,7 @@ mod rust {
         let s = unsafe { String::from_utf8_unchecked(buffer) }; // fine because we know it's all
                                                                 // ASCII 'R's
 
-        env.call("jiroscope-lisp-get-no-read", [s.into_lisp(env)?])
+        env.call("jirascope-lisp-get-no-read", [s.into_lisp(env)?])
     }
 
     #[emacs::defun]
@@ -386,7 +386,7 @@ mod rust {
         let s = unsafe { String::from_utf8_unchecked(buffer) }; // fine because we know it's all
                                                                 // ASCII 'R's
 
-        env.call("jiroscope-lisp-get-read", [s.into_lisp(env)?])
+        env.call("jirascope-lisp-get-read", [s.into_lisp(env)?])
     }
 
     #[emacs::defun]
@@ -405,7 +405,7 @@ mod rust {
         buffer.resize(inc as usize, b'R');
         let s = unsafe { String::from_utf8_unchecked(buffer) }; // fine because we know it's all
 
-        env.call("jiroscope-benchmark-rust-get-read", [s.into_lisp(env)?])
+        env.call("jirascope-benchmark-rust-get-read", [s.into_lisp(env)?])
     }
 
     #[emacs::defun]

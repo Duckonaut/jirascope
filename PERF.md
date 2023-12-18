@@ -102,33 +102,33 @@ An example invocation of the \verb|request.el|-powered function from Rust looks 
 
     let time = std::time::Instant::now();
     for _ in 0..100 {
-        env.call("jiroscope-benchmark-request-el", &args)?;
+        env.call("jirascope-benchmark-request-el", &args)?;
     }
     let elapsed = time.elapsed();
 ```
 
 
-\subsubsection{Jiroscope Test Server Benchmark}
+\subsubsection{Jirascope Test Server Benchmark}
 
 Emacs functions used for testing:
 
 ```el
 ; 1 elisp request + JSON conversion
-(defun jiroscope-benchmark-request-el (url)
+(defun jirascope-benchmark-request-el (url)
     (request-response-data
         (request url
             :parser 'json-read
             :sync t)))
 
 ; 100 requests in elisp from elisp
-(defun jiroscope-benchmark-request-el-full (url)
+(defun jirascope-benchmark-request-el-full (url)
     (dotimes (i 100)
-        (jiroscope-benchmark-request-el url)))
+        (jirascope-benchmark-request-el url)))
 
 ; 100 requests in rust from elisp
-(defun jiroscope-benchmark-ureq-full (url)
+(defun jirascope-benchmark-ureq-full (url)
     (dotimes (i 100)
-        (jiroscope-get-notes)))
+        (jirascope-get-notes)))
 ```
 
 \subsubsubsection{GET test server notes}
@@ -149,7 +149,7 @@ Emacs functions used for testing:
 
 ```el
 ; 1 elisp request + JSON conversion
-(defun jiroscope-auth-benchmark-request-el (url auth_hash)
+(defun jirascope-auth-benchmark-request-el (url auth_hash)
     (request-response-data
         (request url
             :parser 'json-read
@@ -157,14 +157,14 @@ Emacs functions used for testing:
             :sync t)))
 
 ; 100 requests in elisp from elisp
-(defun jiroscope-auth-benchmark-request-el-full (url auth_hash)
+(defun jirascope-auth-benchmark-request-el-full (url auth_hash)
     (dotimes (i 100)
-        (jiroscope-auth-benchmark-request-el url auth_hash)))
+        (jirascope-auth-benchmark-request-el url auth_hash)))
 
 ; 100 requests in rust from elisp
-(defun jiroscope-auth-benchmark-ureq-full ()
+(defun jirascope-auth-benchmark-ureq-full ()
     (dotimes (i 100)
-        (jiroscope-get-all-issues)))
+        (jirascope-get-all-issues)))
 ```
 
 \subsubsubsection{GET Jira Cloud issues}

@@ -1,19 +1,19 @@
 use emacs::{defun, Env, Result, Value};
-use jiroscope_core::jira::{
+use jirascope_core::jira::{
     Project, ProjectCategory, ProjectCreate, ProjectCreateDetails, ProjectEdit, PROJECT_TEMPLATES,
     PROJECT_TYPE_KEYS, PROJECT_TYPE_NAMES_TO_TEMPLATE_RANGE,
 };
 
 use crate::{
-    concurrent, get_jiroscope,
+    concurrent, get_jirascope,
     state::{self, get_state, ConflictCell},
     utils::{
-        self, close_jiroscope_diff_buffer, current_buffer_face_println, current_buffer_println,
-        get_jiroscope_buffer_content, open_jiroscope_buffer, open_jiroscope_diff_buffer,
+        self, close_jirascope_diff_buffer, current_buffer_face_println, current_buffer_println,
+        get_jirascope_buffer_content, open_jirascope_buffer, open_jirascope_diff_buffer,
         prompt_force_change, signal_result, signal_result_async, with_buffer, workthread_spawn,
-        JIROSCOPE_FACE_DIFF_ALERT, JIROSCOPE_FACE_DIFF_NEW, JIROSCOPE_FACE_DIFF_OLD,
+        JIRASCOPE_FACE_DIFF_ALERT, JIRASCOPE_FACE_DIFF_NEW, JIRASCOPE_FACE_DIFF_OLD,
     },
-    JIROSCOPE_DIFF_BUFFER_NAME,
+    JIRASCOPE_DIFF_BUFFER_NAME,
 };
 
 pub fn prompt_select_project(env: &Env) -> Option<Project> {
@@ -34,13 +34,13 @@ pub fn prompt_select_project(env: &Env) -> Option<Project> {
 
 #[defun]
 fn create_interactive(env: &Env) -> Result<()> {
-    let mut jiroscope = get_jiroscope();
+    let mut jirascope = get_jirascope();
     let key = utils::force_prompt_string(env, "Enter project key: ")?;
     let name = utils::force_prompt_string(env, "Enter project name: ")?;
     let description = utils::force_prompt_string(env, "Enter project description: ")?;
     let url = utils::prompt_string(env, "Enter project info URL (or leave empty): ");
 
-    let users = jiroscope
+    let users = jirascope
         .get_users()?
         .into_iter()
         .filter(|u| u.active && u.account_type == "atlassian")
@@ -62,7 +62,7 @@ fn create_interactive(env: &Env) -> Result<()> {
 
     let lead_account_id = users[index.unwrap()].account_id.clone();
 
-    let project_categories = jiroscope.get_project_categories()?;
+    let project_categories = jirascope.get_project_categories()?;
 
     let category_id = if project_categories.is_empty() {
         None
@@ -107,8 +107,8 @@ fn create_interactive(env: &Env) -> Result<()> {
     }
 
     let assignee_type = match index.unwrap() {
-        0 => jiroscope_core::jira::AssigneeType::ProjectLead,
-        1 => jiroscope_core::jira::AssigneeType::Unassigned,
+        0 => jirascope_core::jira::AssigneeType::ProjectLead,
+        1 => jirascope_core::jira::AssigneeType::Unassigned,
         _ => unreachable!(),
     };
 
@@ -150,7 +150,7 @@ fn create_interactive(env: &Env) -> Result<()> {
     };
 
     workthread_spawn(move || {
-        let result = get_jiroscope().create_project(project_create);
+        let result = get_jirascope().create_project(project_create);
 
         if result.is_ok() {
             concurrent::push_command(Box::new(|env| {
@@ -202,7 +202,7 @@ fn edit_interactive(env: &Env) -> Result<()> {
         Some(url)
     };
 
-    let users = get_jiroscope()
+    let users = get_jirascope()
         .get_users()?
         .into_iter()
         .filter(|u| u.active && u.account_type == "atlassian")
@@ -220,7 +220,7 @@ fn edit_interactive(env: &Env) -> Result<()> {
 
     let lead_account_id = index.map(|index| users[index].account_id.clone());
 
-    let mut categories = get_jiroscope().get_project_categories()?;
+    let mut categories = get_jirascope().get_project_categories()?;
     categories.push(ProjectCategory {
         id: 0,
         name: "None".to_string(),
@@ -248,8 +248,8 @@ fn edit_interactive(env: &Env) -> Result<()> {
         "Choose new assignee type (leave empty for no change): ",
         ["Project Lead", "Unassigned"].to_vec().as_slice(),
     ) {
-        Some(0) => Some(jiroscope_core::jira::AssigneeType::ProjectLead),
-        Some(1) => Some(jiroscope_core::jira::AssigneeType::Unassigned),
+        Some(0) => Some(jirascope_core::jira::AssigneeType::ProjectLead),
+        Some(1) => Some(jirascope_core::jira::AssigneeType::Unassigned),
         _ => None,
     };
 
@@ -264,7 +264,7 @@ fn edit_interactive(env: &Env) -> Result<()> {
     };
 
     workthread_spawn(move || {
-        let result = get_jiroscope().edit_project(&*project.key, project_edit);
+        let result = get_jirascope().edit_project(&*project.key, project_edit);
 
         if result.is_ok() {
             concurrent::push_command(Box::new(|env| {
@@ -317,12 +317,12 @@ fn edit_graphical(env: &Env, key: String) -> Result<()> {
     get_state().return_project();
     get_state().check_out_project(key.clone())?;
 
-    open_jiroscope_buffer(env)?;
+    open_jirascope_buffer(env)?;
 
     current_buffer_face_println(
         env,
         &format!("* {} *", project.key),
-        "jiroscope-project-key",
+        "jirascope-project-key",
     )?;
 
     current_buffer_println(env, &format!("Name: {}", project.name))?;
@@ -344,7 +344,7 @@ fn edit_graphical(env: &Env, key: String) -> Result<()> {
 fn edit_graphical_finish(env: &Env) -> Result<()> {
     let mut project_edit = ProjectEdit::default();
 
-    let edited_project = get_jiroscope_buffer_content(env)?;
+    let edited_project = get_jirascope_buffer_content(env)?;
 
     let og_key = match get_state().get_current_work_project() {
         ConflictCell::Empty => return Ok(()),
@@ -401,13 +401,13 @@ fn edit_graphical_finish(env: &Env) -> Result<()> {
 
     project_edit.lead_account_id = match lead_str.as_deref() {
         Some(lead_str) => {
-            let users = get_jiroscope().get_users()?;
+            let users = get_jirascope().get_users()?;
 
             let user = users.into_iter().find(|u| u.display_name == lead_str);
 
             match user {
                 Some(user) => Some(user.account_id),
-                None => return Err(jiroscope_core::Error::jiroscope("Invalid user.").into()),
+                None => return Err(jirascope_core::Error::jirascope("Invalid user.").into()),
             }
         }
         None => None,
@@ -421,7 +421,7 @@ fn edit_graphical_finish(env: &Env) -> Result<()> {
                 display_old_and_changed(env)?;
 
                 if prompt_force_change(env, "Project changed since last access")? {
-                    let result = get_jiroscope().edit_project(og_key.as_str(), project_edit);
+                    let result = get_jirascope().edit_project(og_key.as_str(), project_edit);
 
                     state::get_state().return_project();
 
@@ -430,14 +430,14 @@ fn edit_graphical_finish(env: &Env) -> Result<()> {
                     state::get_state().check_out_project(key.clone())?;
                 }
 
-                close_jiroscope_diff_buffer(env)?;
+                close_jirascope_diff_buffer(env)?;
 
                 Ok(())
             }));
             return;
         }
 
-        let result = get_jiroscope().edit_project(og_key.as_str(), project_edit);
+        let result = get_jirascope().edit_project(og_key.as_str(), project_edit);
 
         state::get_state().return_project();
 
@@ -465,82 +465,82 @@ fn display_old_and_changed(env: &Env) -> Result<()> {
         return Ok(());
     }
 
-    with_buffer(env, JIROSCOPE_DIFF_BUFFER_NAME, |env| {
+    with_buffer(env, JIRASCOPE_DIFF_BUFFER_NAME, |env| {
         env.call("erase-buffer", [])?;
         match work_project {
             ConflictCell::Deleted { key } => {
-                current_buffer_face_println(env, &format!("* {} *", key), "jiroscope-project-key")?;
-                current_buffer_face_println(env, "Issue was deleted.", JIROSCOPE_FACE_DIFF_ALERT)?;
+                current_buffer_face_println(env, &format!("* {} *", key), "jirascope-project-key")?;
+                current_buffer_face_println(env, "Issue was deleted.", JIRASCOPE_FACE_DIFF_ALERT)?;
             }
             ConflictCell::Outdated { key, old } => {
-                current_buffer_face_println(env, &format!("* {} *", key), "jiroscope-project-key")?;
+                current_buffer_face_println(env, &format!("* {} *", key), "jirascope-project-key")?;
                 current_buffer_face_println(
                     env,
                     "Issue was changed since last access.",
-                    JIROSCOPE_FACE_DIFF_ALERT,
+                    JIRASCOPE_FACE_DIFF_ALERT,
                 )?;
-                current_buffer_face_println(env, "Old:", JIROSCOPE_FACE_DIFF_ALERT)?;
+                current_buffer_face_println(env, "Old:", JIRASCOPE_FACE_DIFF_ALERT)?;
                 current_buffer_face_println(
                     env,
                     &format!("* {} *", old.key),
-                    JIROSCOPE_FACE_DIFF_OLD,
+                    JIRASCOPE_FACE_DIFF_OLD,
                 )?;
                 current_buffer_face_println(
                     env,
                     &format!("Name: {}", old.name),
-                    JIROSCOPE_FACE_DIFF_OLD,
+                    JIRASCOPE_FACE_DIFF_OLD,
                 )?;
                 current_buffer_face_println(
                     env,
                     &format!("Description: {}", old.description),
-                    JIROSCOPE_FACE_DIFF_OLD,
+                    JIRASCOPE_FACE_DIFF_OLD,
                 )?;
 
                 if let Some(ref description) = old.url {
                     current_buffer_face_println(
                         env,
                         &format!("URL: {}", description),
-                        JIROSCOPE_FACE_DIFF_OLD,
+                        JIRASCOPE_FACE_DIFF_OLD,
                     )?;
                 }
 
                 current_buffer_face_println(
                     env,
                     &format!("Lead: {}", old.lead.display_name),
-                    JIROSCOPE_FACE_DIFF_OLD,
+                    JIRASCOPE_FACE_DIFF_OLD,
                 )?;
-                current_buffer_face_println(env, "New:", JIROSCOPE_FACE_DIFF_ALERT)?;
+                current_buffer_face_println(env, "New:", JIRASCOPE_FACE_DIFF_ALERT)?;
                 let current = state.get_project_detailed(key).unwrap();
 
                 current_buffer_face_println(
                     env,
                     &format!("* {} *", current.key),
-                    JIROSCOPE_FACE_DIFF_NEW,
+                    JIRASCOPE_FACE_DIFF_NEW,
                 )?;
 
                 current_buffer_face_println(
                     env,
                     &format!("Name: {}", current.name),
-                    JIROSCOPE_FACE_DIFF_NEW,
+                    JIRASCOPE_FACE_DIFF_NEW,
                 )?;
                 current_buffer_face_println(
                     env,
                     &format!("Description: {}", current.description),
-                    JIROSCOPE_FACE_DIFF_NEW,
+                    JIRASCOPE_FACE_DIFF_NEW,
                 )?;
 
                 if let Some(ref description) = current.url {
                     current_buffer_face_println(
                         env,
                         &format!("URL: {}", description),
-                        JIROSCOPE_FACE_DIFF_NEW,
+                        JIRASCOPE_FACE_DIFF_NEW,
                     )?;
                 }
 
                 current_buffer_face_println(
                     env,
                     &format!("Lead: {}", current.lead.display_name),
-                    JIROSCOPE_FACE_DIFF_NEW,
+                    JIRASCOPE_FACE_DIFF_NEW,
                 )?;
             }
             _ => {}
@@ -548,14 +548,14 @@ fn display_old_and_changed(env: &Env) -> Result<()> {
         Ok(())
     })?;
 
-    open_jiroscope_diff_buffer(env)?;
+    open_jirascope_diff_buffer(env)?;
 
     Ok(())
 }
 
 #[defun]
 fn delete_project_interactive(env: &Env) -> Result<Value<'_>> {
-    let projects = get_jiroscope().get_projects()?;
+    let projects = get_jirascope().get_projects()?;
 
     let index = utils::prompt_select_index(
         env,
@@ -574,7 +574,7 @@ fn delete_project_interactive(env: &Env) -> Result<Value<'_>> {
     let project_key = projects[index.unwrap()].key.clone();
 
     workthread_spawn(move || {
-        let result = get_jiroscope().delete_project(&*project_key);
+        let result = get_jirascope().delete_project(&*project_key);
 
         if result.is_ok() {
             concurrent::push_command(Box::new(move |env| {

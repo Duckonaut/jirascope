@@ -1,5 +1,5 @@
 [package]
-name = "jiroscope-dyn"
+name = "jirascope-dyn"
 version = "0.1.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -10,11 +10,11 @@ crate-type = ["cdylib"]
 [features]
 default = []
 full = ["test_server", "benchmark"]
-test_server = ["jiroscope-core/test_server"]
+test_server = ["jirascope-core/test_server"]
 benchmark = []
 
 [dependencies]
 emacs = "0.18.0"
-jiroscope-core = { path = "../jiroscope-core" }
+jirascope-core = { path = "../jirascope-core" }
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = "1.0.96"

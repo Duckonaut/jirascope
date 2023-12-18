@@ -1,19 +1,19 @@
 use emacs::{defun, Env, Result, Value};
-use jiroscope_core::jira::{
+use jirascope_core::jira::{
     AtlassianDoc, Issue, IssueCreation, IssueCreationFields, IssueEdit, IssueTransitionDescriptor,
     WrappedId,
 };
 
 use crate::{
-    concurrent, get_jiroscope, project,
+    concurrent, get_jirascope, project,
     state::{self, get_state, ConflictCell},
     utils::{
-        self, close_jiroscope_diff_buffer, current_buffer_face_println, current_buffer_println,
-        get_jiroscope_buffer_content, open_jiroscope_buffer, open_jiroscope_diff_buffer,
+        self, close_jirascope_diff_buffer, current_buffer_face_println, current_buffer_println,
+        get_jirascope_buffer_content, open_jirascope_buffer, open_jirascope_diff_buffer,
         prompt_force_change, signal_result, signal_result_async, with_buffer, workthread_spawn,
-        ScopeCleaner, JIROSCOPE_FACE_DIFF_ALERT, JIROSCOPE_FACE_DIFF_NEW, JIROSCOPE_FACE_DIFF_OLD,
+        ScopeCleaner, JIRASCOPE_FACE_DIFF_ALERT, JIRASCOPE_FACE_DIFF_NEW, JIRASCOPE_FACE_DIFF_OLD,
     },
-    JIROSCOPE_DIFF_BUFFER_NAME,
+    JIRASCOPE_DIFF_BUFFER_NAME,
 };
 
 fn prompt_issue(env: &Env) -> Option<Issue> {
@@ -35,9 +35,9 @@ fn prompt_issue(env: &Env) -> Option<Issue> {
 }
 
 fn prompt_issue_transition(env: &Env, issue_key: &str) -> Option<IssueTransitionDescriptor> {
-    let mut jiroscope = get_jiroscope();
+    let mut jirascope = get_jirascope();
     // let user choose issue status
-    let mut issue_transitions = jiroscope
+    let mut issue_transitions = jirascope
         .get_issue_transitions(issue_key)
         .unwrap()
         .transitions;
@@ -81,7 +81,7 @@ fn prompt_issue_parent(env: &Env, project_key: &str) -> Option<i64> {
 
 #[defun]
 fn create_interactive(env: &Env) -> Result<Value<'_>> {
-    let mut jiroscope = get_jiroscope();
+    let mut jirascope = get_jirascope();
     let state = get_state();
 
     // let user choose project
@@ -92,7 +92,7 @@ fn create_interactive(env: &Env) -> Result<Value<'_>> {
     drop(state);
 
     // let user choose issue type
-    let create_meta = jiroscope.get_issue_creation_meta()?;
+    let create_meta = jirascope.get_issue_creation_meta()?;
     let mut issue_types = create_meta
         .projects
         .into_iter()
@@ -155,7 +155,7 @@ fn create_interactive(env: &Env) -> Result<Value<'_>> {
     };
 
     workthread_spawn(move || {
-        let result = get_jiroscope().create_issue(issue_creation);
+        let result = get_jirascope().create_issue(issue_creation);
 
         if result.is_ok() {
             concurrent::push_command(Box::new(|env| {
@@ -215,7 +215,7 @@ fn edit_interactive(env: &Env) -> Result<Value<'_>> {
                 env.message("Issue changed since last access. Please check the diff buffer.")?;
 
                 if prompt_force_change(env, "Issue changed since last access")? {
-                    let result = get_jiroscope().edit_issue(&*issue.key, issue_edit);
+                    let result = get_jirascope().edit_issue(&*issue.key, issue_edit);
 
                     signal_result(env, result, "Issue edited.", "Failed to edit issue.")?;
                 }
@@ -225,7 +225,7 @@ fn edit_interactive(env: &Env) -> Result<Value<'_>> {
             return;
         }
 
-        let result = get_jiroscope().edit_issue(&*issue.key, issue_edit);
+        let result = get_jirascope().edit_issue(&*issue.key, issue_edit);
 
         signal_result_async(result, "Issue edited.", "Failed to edit issue.");
         // make sure the guard is moved into the closure
@@ -265,9 +265,9 @@ fn edit_graphical(env: &Env, issue_key: String) -> Result<()> {
     get_state().return_issue();
     get_state().check_out_issue(issue.key.clone())?;
 
-    open_jiroscope_buffer(env)?;
+    open_jirascope_buffer(env)?;
 
-    current_buffer_face_println(env, &format!("* {} *", issue_key), "jiroscope-issue-key")?;
+    current_buffer_face_println(env, &format!("* {} *", issue_key), "jirascope-issue-key")?;
 
     current_buffer_println(env, &format!("Summary: {}", issue.fields.summary))?;
 
@@ -277,7 +277,7 @@ fn edit_graphical(env: &Env, issue_key: String) -> Result<()> {
         current_buffer_println(env, &format!("Description: {}", description.to_markdown()))?;
     }
 
-    utils::set_buffer_mode(env, utils::JiroscopeBufferMode::IssueEdit)?;
+    utils::set_buffer_mode(env, utils::JirascopeBufferMode::IssueEdit)?;
 
     Ok(())
 }
@@ -286,7 +286,7 @@ fn edit_graphical(env: &Env, issue_key: String) -> Result<()> {
 fn edit_graphical_finish(env: &Env) -> Result<Value<'_>> {
     let mut issue_edit = IssueEdit::default();
 
-    let edited_issue = get_jiroscope_buffer_content(env)?;
+    let edited_issue = get_jirascope_buffer_content(env)?;
 
     // parse out issue edit
     let key = edited_issue
@@ -321,7 +321,7 @@ fn edit_graphical_finish(env: &Env) -> Result<Value<'_>> {
                 display_old_and_changed(env)?;
 
                 if prompt_force_change(env, "Issue changed since last access")? {
-                    let result = get_jiroscope().edit_issue(&*key, issue_edit);
+                    let result = get_jirascope().edit_issue(&*key, issue_edit);
 
                     state::get_state().return_issue();
 
@@ -330,14 +330,14 @@ fn edit_graphical_finish(env: &Env) -> Result<Value<'_>> {
                     state::get_state().check_out_issue(key.clone())?;
                 }
 
-                close_jiroscope_diff_buffer(env)?;
+                close_jirascope_diff_buffer(env)?;
 
                 Ok(())
             }));
             return;
         }
 
-        let result = get_jiroscope().edit_issue(&*key, issue_edit);
+        let result = get_jirascope().edit_issue(&*key, issue_edit);
 
         state::get_state().return_issue();
 
@@ -362,58 +362,58 @@ fn display_old_and_changed(env: &Env) -> Result<()> {
         return Ok(());
     }
 
-    with_buffer(env, JIROSCOPE_DIFF_BUFFER_NAME, |env| {
+    with_buffer(env, JIRASCOPE_DIFF_BUFFER_NAME, |env| {
         env.call("erase-buffer", [])?;
         match work_issue {
             ConflictCell::Deleted { key } => {
-                current_buffer_face_println(env, &format!("* {} *", key), "jiroscope-issue-key")?;
-                current_buffer_face_println(env, "Issue was deleted.", JIROSCOPE_FACE_DIFF_ALERT)?;
+                current_buffer_face_println(env, &format!("* {} *", key), "jirascope-issue-key")?;
+                current_buffer_face_println(env, "Issue was deleted.", JIRASCOPE_FACE_DIFF_ALERT)?;
             }
             ConflictCell::Outdated { key, old } => {
-                current_buffer_face_println(env, &format!("* {} *", key), "jiroscope-issue-key")?;
+                current_buffer_face_println(env, &format!("* {} *", key), "jirascope-issue-key")?;
                 current_buffer_face_println(
                     env,
                     "Issue was changed since last access.",
-                    JIROSCOPE_FACE_DIFF_ALERT,
+                    JIRASCOPE_FACE_DIFF_ALERT,
                 )?;
-                current_buffer_face_println(env, "Old:", JIROSCOPE_FACE_DIFF_ALERT)?;
+                current_buffer_face_println(env, "Old:", JIRASCOPE_FACE_DIFF_ALERT)?;
                 current_buffer_face_println(
                     env,
                     &format!("Summary: {}", old.fields.summary),
-                    JIROSCOPE_FACE_DIFF_OLD,
+                    JIRASCOPE_FACE_DIFF_OLD,
                 )?;
                 current_buffer_face_println(
                     env,
                     &format!("Status: {}", old.fields.status.name,),
-                    JIROSCOPE_FACE_DIFF_OLD,
+                    JIRASCOPE_FACE_DIFF_OLD,
                 )?;
 
                 if let Some(ref description) = old.fields.description {
                     current_buffer_face_println(
                         env,
                         &format!("Description: {}", description.to_markdown()),
-                        JIROSCOPE_FACE_DIFF_OLD,
+                        JIRASCOPE_FACE_DIFF_OLD,
                     )?;
                 }
-                current_buffer_face_println(env, "New:", JIROSCOPE_FACE_DIFF_ALERT)?;
+                current_buffer_face_println(env, "New:", JIRASCOPE_FACE_DIFF_ALERT)?;
                 let current = state.get_issue(key).unwrap();
 
                 current_buffer_face_println(
                     env,
                     &format!("Summary: {}", current.fields.summary),
-                    JIROSCOPE_FACE_DIFF_NEW,
+                    JIRASCOPE_FACE_DIFF_NEW,
                 )?;
                 current_buffer_face_println(
                     env,
                     &format!("Status: {}", current.fields.status.name),
-                    JIROSCOPE_FACE_DIFF_NEW,
+                    JIRASCOPE_FACE_DIFF_NEW,
                 )?;
 
                 if let Some(ref description) = current.fields.description {
                     current_buffer_face_println(
                         env,
                         &format!("Description: {}", description.to_markdown()),
-                        JIROSCOPE_FACE_DIFF_NEW,
+                        JIRASCOPE_FACE_DIFF_NEW,
                     )?;
                 }
             }
@@ -422,7 +422,7 @@ fn display_old_and_changed(env: &Env) -> Result<()> {
         Ok(())
     })?;
 
-    open_jiroscope_diff_buffer(env)?;
+    open_jirascope_diff_buffer(env)?;
 
     Ok(())
 }
@@ -439,7 +439,7 @@ fn delete_interactive(env: &Env) -> Result<Value<'_>> {
     let issue_key = issue.key;
 
     workthread_spawn(move || {
-        let result = get_jiroscope().delete_issue(&*issue_key);
+        let result = get_jirascope().delete_issue(&*issue_key);
         signal_result_async(result, "Issue deleted.", "Failed to delete issue.");
     });
 
@@ -466,7 +466,7 @@ fn transition_interactive(env: &Env) -> Result<Value<'_>> {
     let transition = transition.unwrap();
 
     workthread_spawn(move || {
-        let result = get_jiroscope().transition_issue(issue_key.as_str(), transition);
+        let result = get_jirascope().transition_issue(issue_key.as_str(), transition);
 
         signal_result_async(result, "Transitioned issue.", "Failed to transition issue.");
     });
@@ -475,11 +475,11 @@ fn transition_interactive(env: &Env) -> Result<Value<'_>> {
 }
 
 #[defun]
-fn display(env: &Env, issue_key: String) -> Result<Value<'_>> {
-    let issue = get_jiroscope().get_issue(&*issue_key)?;
-    open_jiroscope_buffer(env)?;
+fn display(env: &Env, issue_key: String) -> Result<()> {
+    let issue = get_jirascope().get_issue(&*issue_key)?;
+    open_jirascope_buffer(env)?;
 
-    current_buffer_face_println(env, &format!("* {} *", issue_key), "jiroscope-issue-key")?;
+    current_buffer_face_println(env, &format!("* {} *", issue_key), "jirascope-issue-key")?;
 
     current_buffer_println(env, &format!("Summary: {}", issue.fields.summary))?;
 
@@ -489,22 +489,22 @@ fn display(env: &Env, issue_key: String) -> Result<Value<'_>> {
         current_buffer_println(env, &format!("Description: {}", description.to_markdown()))?;
     }
 
-    utils::set_buffer_mode(env, utils::JiroscopeBufferMode::Issue)?;
+    utils::set_buffer_mode(env, utils::JirascopeBufferMode::Issue)?;
 
-    utils::nil(env)
+    Ok(())
 }
 
 #[defun]
-fn display_interactive(env: &Env) -> Result<Value<'_>> {
+fn display_interactive(env: &Env) -> Result<()> {
     let issue = prompt_issue(env);
 
     if issue.is_none() {
-        return utils::nil(env);
+        return Ok(());
     }
 
     let issue = issue.unwrap();
 
     display(env, issue.key)?;
 
-    utils::nil(env)
+    Ok(())
 }

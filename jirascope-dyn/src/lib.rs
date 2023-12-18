@@ -3,7 +3,7 @@
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use emacs::{defun, Env, Result};
-use jiroscope_core::{Auth, Config, Jiroscope};
+use jirascope_core::{Auth, Config, Jirascope};
 
 #[cfg(feature = "benchmark")]
 mod benchmark;
@@ -19,9 +19,9 @@ mod utils;
 // Emacs won't load the module without this.
 emacs::plugin_is_GPL_compatible!();
 
-static JIROSCOPE: OnceLock<Mutex<Jiroscope>> = OnceLock::new();
-static JIROSCOPE_BUFFER_NAME: &str = "*jiroscope*";
-static JIROSCOPE_DIFF_BUFFER_NAME: &str = "*jiroscope-diff*";
+static JIRASCOPE: OnceLock<Mutex<Jirascope>> = OnceLock::new();
+static JIRASCOPE_BUFFER_NAME: &str = "*jirascope*";
+static JIRASCOPE_DIFF_BUFFER_NAME: &str = "*jirascope-diff*";
 
 // Register the initialization hook that Emacs will call when it loads the module.
 #[emacs::module]
@@ -29,7 +29,7 @@ fn init(env: &Env) -> Result<()> {
     env.call(
         "set",
         (
-            env.intern("jiroscope-dyn--version")?,
+            env.intern("jirascope-dyn--version")?,
             option_env!("CARGO_PKG_VERSION"),
         ),
     )?;
@@ -50,13 +50,13 @@ fn setup(url: String, login: String, api_token: String) -> Result<()> {
     let config = Config::new(url);
     let auth = Auth::new(login, api_token);
 
-    let mut jiroscope = Jiroscope::new(config, auth);
-    jiroscope.init()?;
+    let mut jirascope = Jirascope::new(config, auth);
+    jirascope.init()?;
 
-    let res = JIROSCOPE.set(Mutex::new(jiroscope));
+    let res = JIRASCOPE.set(Mutex::new(jirascope));
 
     if res.is_err() {
-        panic!("Jiroscope already initialized.");
+        panic!("Jirascope already initialized.");
     }
 
     state::setup(30.0);
@@ -64,10 +64,10 @@ fn setup(url: String, login: String, api_token: String) -> Result<()> {
     Ok(())
 }
 
-fn get_jiroscope<'a>() -> MutexGuard<'a, Jiroscope> {
-    let j = JIROSCOPE
+fn get_jirascope<'a>() -> MutexGuard<'a, Jirascope> {
+    let j = JIRASCOPE
         .get_or_init(|| {
-            panic!("Jiroscope not initialized. Call `jiroscope-dyn--setup` first.");
+            panic!("Jirascope not initialized. Call `jirascope-dyn--setup` first.");
         })
         .lock()
         .unwrap();

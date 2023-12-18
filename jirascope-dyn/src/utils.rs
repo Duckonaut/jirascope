@@ -5,11 +5,11 @@ use std::{
 
 use emacs::{Env, IntoLisp, Result, Value};
 
-use crate::{concurrent, state, JIROSCOPE_BUFFER_NAME, JIROSCOPE_DIFF_BUFFER_NAME};
+use crate::{concurrent, state, JIRASCOPE_BUFFER_NAME, JIRASCOPE_DIFF_BUFFER_NAME};
 
-pub(crate) static JIROSCOPE_FACE_DIFF_ALERT: &str = "jiroscope-diff-alert";
-pub(crate) static JIROSCOPE_FACE_DIFF_NEW: &str = "jiroscope-diff-new";
-pub(crate) static JIROSCOPE_FACE_DIFF_OLD: &str = "jiroscope-diff-old";
+pub(crate) static JIRASCOPE_FACE_DIFF_ALERT: &str = "jirascope-diff-alert";
+pub(crate) static JIRASCOPE_FACE_DIFF_NEW: &str = "jirascope-diff-new";
+pub(crate) static JIRASCOPE_FACE_DIFF_OLD: &str = "jirascope-diff-old";
 
 pub fn nil(env: &Env) -> Result<Value<'_>> {
     ().into_lisp(env)
@@ -227,7 +227,7 @@ pub fn force_prompt_string(env: &Env, prompt: &str) -> emacs::Result<String> {
     if let Some(s) = s {
         Ok(s)
     } else {
-        Err(jiroscope_core::Error::jiroscope("Empty string not allowed.").into())
+        Err(jirascope_core::Error::jirascope("Empty string not allowed.").into())
     }
 }
 
@@ -245,10 +245,10 @@ pub fn goto_buffer(env: &Env, buffer_name: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn open_jiroscope_buffer(env: &Env) -> Result<()> {
+pub fn open_jirascope_buffer(env: &Env) -> Result<()> {
     let buffer = env.call(
         "get-buffer-create",
-        [JIROSCOPE_BUFFER_NAME.to_string().into_lisp(env)?],
+        [JIRASCOPE_BUFFER_NAME.to_string().into_lisp(env)?],
     )?;
 
     env.call("switch-to-buffer", [buffer])?;
@@ -259,10 +259,10 @@ pub fn open_jiroscope_buffer(env: &Env) -> Result<()> {
     Ok(())
 }
 
-pub fn open_jiroscope_diff_buffer(env: &Env) -> Result<()> {
+pub fn open_jirascope_diff_buffer(env: &Env) -> Result<()> {
     let buffer = env.call(
         "get-buffer-create",
-        [JIROSCOPE_DIFF_BUFFER_NAME.to_string().into_lisp(env)?],
+        [JIRASCOPE_DIFF_BUFFER_NAME.to_string().into_lisp(env)?],
     )?;
 
     env.call("display-buffer-in-side-window", [buffer, nil(env)?])?;
@@ -270,10 +270,10 @@ pub fn open_jiroscope_diff_buffer(env: &Env) -> Result<()> {
     Ok(())
 }
 
-pub fn close_jiroscope_diff_buffer(env: &Env) -> Result<()> {
+pub fn close_jirascope_diff_buffer(env: &Env) -> Result<()> {
     let buffer = env.call(
         "get-buffer-create",
-        [JIROSCOPE_DIFF_BUFFER_NAME.to_string().into_lisp(env)?],
+        [JIRASCOPE_DIFF_BUFFER_NAME.to_string().into_lisp(env)?],
     )?;
 
     env.call("kill-buffer", [buffer])?;
@@ -281,16 +281,16 @@ pub fn close_jiroscope_diff_buffer(env: &Env) -> Result<()> {
     Ok(())
 }
 
-pub fn get_jiroscope_buffer_content(env: &Env) -> Result<String> {
-    with_buffer(env, JIROSCOPE_BUFFER_NAME, |env| {
+pub fn get_jirascope_buffer_content(env: &Env) -> Result<String> {
+    with_buffer(env, JIRASCOPE_BUFFER_NAME, |env| {
         let args = vec![];
         let content = env.call("buffer-string", &args)?;
         content.into_rust()
     })
 }
 
-pub fn clear_jiroscope_buffer(env: &Env) -> Result<()> {
-    let args = vec![JIROSCOPE_BUFFER_NAME.to_string().into_lisp(env)?];
+pub fn clear_jirascope_buffer(env: &Env) -> Result<()> {
+    let args = vec![JIRASCOPE_BUFFER_NAME.to_string().into_lisp(env)?];
 
     let buffer = env.call("get-buffer-create", &args)?;
 
@@ -352,29 +352,29 @@ pub fn current_buffer_face_println(env: &Env, s: &str, face: &str) -> Result<()>
 
 pub fn current_buffer_button(env: &Env, s: &str, button_type: &str) -> Result<()> {
     env.call(
-        "jiroscope-insert-button",
+        "jirascope-insert-button",
         [s.to_string().into_lisp(env)?, env.intern(button_type)?],
     )?;
     Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum JiroscopeBufferMode {
+pub enum JirascopeBufferMode {
     Issue,
     Project,
     Tree,
     IssueEdit,
 }
 
-static JIROSCOPE_BUFFER_MODE: Mutex<JiroscopeBufferMode> = Mutex::new(JiroscopeBufferMode::Issue);
+static JIRASCOPE_BUFFER_MODE: Mutex<JirascopeBufferMode> = Mutex::new(JirascopeBufferMode::Issue);
 
-pub fn set_buffer_mode(env: &Env, mode: JiroscopeBufferMode) -> Result<()> {
-    let mut buffer_mode = JIROSCOPE_BUFFER_MODE.lock().unwrap();
+pub fn set_buffer_mode(env: &Env, mode: JirascopeBufferMode) -> Result<()> {
+    let mut buffer_mode = JIRASCOPE_BUFFER_MODE.lock().unwrap();
     *buffer_mode = mode;
 
-    with_buffer(env, JIROSCOPE_BUFFER_NAME, |env| {
+    with_buffer(env, JIRASCOPE_BUFFER_NAME, |env| {
         match mode {
-            JiroscopeBufferMode::IssueEdit => {
+            JirascopeBufferMode::IssueEdit => {
                 env.call("set", [env.intern("buffer-read-only")?, nil(env)?])?;
             }
 
@@ -391,8 +391,8 @@ pub fn set_buffer_mode(env: &Env, mode: JiroscopeBufferMode) -> Result<()> {
     Ok(())
 }
 
-pub fn get_buffer_mode() -> Option<JiroscopeBufferMode> {
-    let buffer_mode = JIROSCOPE_BUFFER_MODE.lock().unwrap();
+pub fn get_buffer_mode() -> Option<JirascopeBufferMode> {
+    let buffer_mode = JIRASCOPE_BUFFER_MODE.lock().unwrap();
     Some(*buffer_mode)
 }
 

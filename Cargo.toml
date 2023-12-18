@@ -2,10 +2,10 @@
 resolver = "2"
 
 members = [
-    "jiroscope-core",
-    "jiroscope-dyn",
-    "jiroscope-cli",
-    "jiroscope-test-server",
+    "jirascope-core",
+    "jirascope-dyn",
+    "jirascope-cli",
+    "jirascope-test-server",
 ]
 
 exclude = [
