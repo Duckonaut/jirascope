@@ -23,6 +23,41 @@
   ;; Version string set by `jirascope-dyn' when it's loaded.
   (defvar jirascope-dyn--version))
 
+(defun jirascope-dyn-get--internet-connectivity ()
+  "Return `t' if we have internet connectivity, `nil' otherwise."
+  (condition-case _
+      (url-retrieve-synchronously "https://github.com")
+    (error nil)))
+
+(defun jirascope-dyn-get--can-fetch (version)
+  "Return `t' if we can fetch the pre-built binary for VERSION, `nil' otherwise."
+  ;; perform a HEAD request to check if the file exists.
+  (let ((url-request-method "HEAD")
+        (url (format
+               "https://github.com/Duckonaut/jirascope/releases/download/v%s/jirascope-dyn.so"
+               version)))
+    (condition-case _
+        (with-current-buffer (url-retrieve-synchronously url)
+          (goto-char (point-min))
+          ;; we're happy with a 200 or 302 response.
+          (or (looking-at "HTTP/.* 200")
+              (looking-at "HTTP/.* 302")))
+        (error nil))))
+
+(defun jirascope-dyn-get--can-build ()
+  "Return `t' if we can build the dynamic module, `nil' otherwise."
+  (executable-find "cargo"))
+
+(defun jirascope-dyn-get-available ()
+  "Returns `t' if we either have a valid `jirascope-dyn' binary or can build/fetch one."
+  ;; Check if we have a valid binary.
+  (or (jirascope-dyn--try-load)
+      ;; check if we have internet connectivity.
+      (and (jirascope-dyn-get--internet-connectivity)
+           ;; check if we can build/fetch a binary.
+           (or (jirascope-dyn-get--can-fetch (jirascope-dyn-get--recorded-version))
+               (jirascope-dyn-get--can-build)))))
+
 (defconst jirascope-dyn-get--version-file "DYN-VERSION"
   "File that records the version after getting the binary from a source.")
 
@@ -138,8 +173,10 @@ This function records the downloaded version in the manifest
          (_ (unless (file-directory-p bin-dir) (make-directory bin-dir)))
          (local-name (jirascope-dyn-get--file))
          (remote-name local-name)
+         (url-request-method "GET")
          (url (format
-                "https://github.com/Duckonaut/jirascope/releases/download/v%s/%s"               version
+                "https://github.com/Duckonaut/jirascope/releases/download/v%s/%s"
+                version
                 remote-name)))
     (jirascope-dyn-get--log "Downloading %s" url)
     (jirascope-dyn-get--url-copy-file url local-name :ok-if-already-exists)

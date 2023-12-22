@@ -26,9 +26,13 @@
   (defconst jirascope--dyn-version "0.1.2"
     "Required version of the dynamic module `jirascope-dyn'.")
   (require 'jirascope-dyn-get)
-  (jirascope-dyn-get-ensure jirascope--dyn-version))
+  (if (jirascope-dyn-get-available)
+      (progn
+        (message jirascope--dyn-version)
+        (jirascope-dyn-get-ensure jirascope--dyn-version)
+        (require 'jirascope-dyn))
+      (error "Cannot fetch `jirascope-dyn' dynamic module")))
 
-(require 'jirascope-dyn)
 
 (defun jirascope-setup (url login api_token)
   "Setup Jirascope with the given cloud URL, LOGIN and API_TOKEN."
