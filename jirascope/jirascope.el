@@ -2,7 +2,7 @@
 
 ;; SPDX-License-Identifier: MIT OR Apache-2.0
 ;; Author: Stanisław Zagórowski <duckonaut@gmail.com>
-;; Version: 0.1.3
+;; Version: 0.1.4
 ;; Keywords: tools
 ;; URL: https://github.com/Duckonaut/jirascope
 ;; Package-Requires: ((emacs "25.1"))
@@ -28,7 +28,7 @@
 
 ;; Load the dynamic module at compile time as well, to satisfy the byte compiler.
 (eval-and-compile
-  (defconst jirascope--dyn-version "0.1.3"
+  (defconst jirascope--dyn-version "0.1.4"
     "Required version of the dynamic module `jirascope-dyn'.")
   (require 'jirascope-dyn-get)
   (if (jirascope-dyn-get-installed)
