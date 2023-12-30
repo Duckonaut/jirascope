@@ -58,6 +58,20 @@
            (or (jirascope-dyn-get--can-fetch (jirascope-dyn-get--recorded-version))
                (jirascope-dyn-get--can-build)))))
 
+(defun jirascope-dyn-get-installed ()
+  "Return `t' if we have a valid `jirascope-dyn' binary, `nil' otherwise."
+  (jirascope-dyn--try-load))
+
+(defun jirascope-dyn-get-loaded ()
+  "Return `t' if `jirascope-dyn' is loaded, `nil' otherwise."
+  (featurep 'jirascope-dyn))
+
+(defun jirascope-dyn-get-install (version)
+  "Install the dynamic module `jirascope-dyn'."
+  (if (jirascope-dyn-get-available)
+    (jirascope-dyn-get-ensure version)
+    (error "No viable installation method found")))
+
 (defconst jirascope-dyn-get--version-file "DYN-VERSION"
   "File that records the version after getting the binary from a source.")
 

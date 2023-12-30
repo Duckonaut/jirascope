@@ -67,7 +67,7 @@ fn setup(url: String, login: String, api_token: String) -> Result<()> {
 fn get_jirascope<'a>() -> MutexGuard<'a, Jirascope> {
     let j = JIRASCOPE
         .get_or_init(|| {
-            panic!("Jirascope not initialized. Call `jirascope-dyn--setup` first.");
+            panic!("Jirascope not setup. Call `jirascope-setup` first.");
         })
         .lock()
         .unwrap();

@@ -21,18 +21,19 @@
 (unless (functionp 'module-load)
   (error "Dynamic module feature not available, please compile Emacs --with-modules option turned on"))
 
+(defun jirascope-install ()
+  "Install the dynamic module `jirascope-dyn'."
+  (interactive)
+  (jirascope-dyn-get-install jirascope--dyn-version))
+
 ;; Load the dynamic module at compile time as well, to satisfy the byte compiler.
 (eval-and-compile
   (defconst jirascope--dyn-version "0.1.3"
     "Required version of the dynamic module `jirascope-dyn'.")
   (require 'jirascope-dyn-get)
-  (if (jirascope-dyn-get-available)
-      (progn
-        (message jirascope--dyn-version)
-        (jirascope-dyn-get-ensure jirascope--dyn-version)
-        (require 'jirascope-dyn))
-      (error "Cannot fetch `jirascope-dyn' dynamic module")))
-
+  (if (jirascope-dyn-get-installed)
+    (require 'jirascope-dyn)
+    (error "`jirascope-dyn' dynamic module not installed. If this is your first time using Jirascope, please run `M-x jirascope-install'")))
 
 (defun jirascope-setup (url login api_token)
   "Setup Jirascope with the given cloud URL, LOGIN and API_TOKEN."
