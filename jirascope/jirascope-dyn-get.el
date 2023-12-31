@@ -21,16 +21,19 @@
 
 (eval-when-compile
   ;; Version string set by `jirascope-dyn' when it's loaded.
-  (defvar jirascope-dyn--version))
+  (defvar jirascope-dyn--version)
+  ;; Directory where `jirascope-dyn' is located (custom, defined in `jirascope.el').
+  (defvar jirascope-dyn-dir))
+
 
 (defun jirascope-dyn-get--internet-connectivity ()
-  "Return `t' if we have internet connectivity, `nil' otherwise."
+  "Return t if we have internet connectivity, nil otherwise."
   (condition-case _
       (url-retrieve-synchronously "https://github.com")
     (error nil)))
 
 (defun jirascope-dyn-get--can-fetch (version)
-  "Return `t' if we can fetch the pre-built binary for VERSION, `nil' otherwise."
+  "Return t if we can fetch the pre-built binary for VERSION, nil otherwise."
   ;; perform a HEAD request to check if the file exists.
   (let ((url-request-method "HEAD")
         (url (format
@@ -45,13 +48,13 @@
         (error nil))))
 
 (defun jirascope-dyn-get--can-build ()
-  "Return `t' if we can build the dynamic module, `nil' otherwise."
+  "Return t if we can build the dynamic module, nil otherwise."
   (executable-find "cargo"))
 
 (defun jirascope-dyn-get-available ()
-  "Returns `t' if we either have a valid `jirascope-dyn' binary or can build/fetch one."
+  "Returns t if we either a valid `jirascope-dyn' binary or can build/fetch one."
   ;; Check if we have a valid binary.
-  (or (jirascope-dyn--try-load)
+  (or (jirascope-dyn-get--try-load)
       ;; check if we have internet connectivity.
       (and (jirascope-dyn-get--internet-connectivity)
            ;; check if we can build/fetch a binary.
@@ -59,37 +62,21 @@
                (jirascope-dyn-get--can-build)))))
 
 (defun jirascope-dyn-get-installed ()
-  "Return `t' if we have a valid `jirascope-dyn' binary, `nil' otherwise."
-  (jirascope-dyn--try-load))
+  "Return t if we have a valid `jirascope-dyn' binary, nil otherwise."
+  (jirascope-dyn-get--try-load))
 
 (defun jirascope-dyn-get-loaded ()
-  "Return `t' if `jirascope-dyn' is loaded, `nil' otherwise."
+  "Return t if `jirascope-dyn' is loaded, nil otherwise."
   (featurep 'jirascope-dyn))
 
 (defun jirascope-dyn-get-install (version)
-  "Install the dynamic module `jirascope-dyn'."
+  "Install the dynamic module `jirascope-dyn' with VERSION."
   (if (jirascope-dyn-get-available)
     (jirascope-dyn-get-ensure version)
     (error "No viable installation method found")))
 
 (defconst jirascope-dyn-get--version-file "DYN-VERSION"
   "File that records the version after getting the binary from a source.")
-
-(defconst jirascope--dir (file-name-directory (or (locate-library "jirascope.el") ""))
-  "The directory where the library `jirascope' is located.")
-
-(defgroup jirascope nil
-  "Core jirascope APIs."
-  :group 'jirascope)
-
-(defcustom jirascope-dyn-dir jirascope--dir
-  "The directory that `jirascope-dyn' module is resided.
-This should be set before `jirascope' is loaded.
-
-Example setting:
-\(setq jirascope-dyn-dir (expand-file-name \"jirascope/\" user-emacs-directory))"
-  :group 'jirascope
-  :type 'directory)
 
 (defcustom jirascope-dyn-get-from '(:github :compilation)
   "Where the dynamic module binary should come from, in order of priority.
@@ -201,7 +188,7 @@ This function records the downloaded version in the manifest
 ;; ----------------------------------------------------------------------------
 ;; Local compilation.
 
-(define-error 'jirascope-compile-error "Could not compile `jirascope-dyn'")
+(define-error 'jirascope-dyn-get--compile-error "Could not compile `jirascope-dyn'")
 
 (defun jirascope-dyn-get--build-output (face &rest args)
   "Print a message to the `jirascope-dyn-get' logger.
@@ -215,19 +202,21 @@ ARGS are passed to `format'."
       (insert str)
       (insert "\n"))))
 
+(defun jirascope-dyn-get--print-stdout (_proc string)
+  "Print STRING to stdout."
+  (princ string))
+
 (defmacro jirascope-dyn-get--compilation-to-stdout (condition &rest body)
   "Eval BODY forms with compilation output conditionally redirected to `princ'.
 If CONDITION is true, redirect compilation output to `princ' instead of the
 compilation buffer. Otherwise, eval BODY forms normally."
   (declare (indent 1))
-  (let ((print-stdout (make-symbol "print-stdout")))
-    `(if ,condition
-         (let ((,print-stdout (lambda (_proc string) (princ string))))
-           (advice-add 'compilation-filter :override #',print-stdout)
-           (unwind-protect
-               (progn ,@body)
-             (advice-remove 'compilation-filter #',print-stdout)))
-       ,@body)))
+  `(if ,condition
+    (advice-add 'compilation-filter :override #'jirascope-dyn-get--print-stdout)
+    (unwind-protect
+      (progn ,@body)
+      (advice-remove 'compilation-filter #'jirascope-dyn-get--print-stdout))
+    ,@body))
 
 (defun jirascope-dyn-get--build-version ()
   "Return the dynamic module's version after asking `cargo'."
@@ -256,7 +245,7 @@ compilation process."
            (out-name (jirascope-dyn-get--out-file))
            (out-file (format "target/release/%s" out-name)))
       (unless (string= status "finished\n")
-        (signal 'jirascope-compile-error
+        (signal 'jirascope-dyn-get--compile-error
                 (list (format "Compilation failed with status: %s" status))))
       (jirascope-dyn-get--build-output 'compilation-info
         "Moving binary %s from build dir" out-name)
@@ -333,17 +322,17 @@ This function records the built version in the manifest
 
 On Windows, if `jirascope-dyn' has already been loaded, compilation will fail
 because the OS doesn't allow overwriting opened dynamically-loaded libraries."
-  (unless dir (setq dir jirascope--dir))
+  (unless dir (setq dir jirascope-dyn-dir))
   (while (not (executable-find "cargo"))
     (if noninteractive
-        (signal 'jirascope-compile-error "Could not find `cargo' executable")
+        (signal 'jirascope-dyn-get--compile-error "Could not find `cargo' executable")
       ;; TODO: Make a better prompt.
       (unless
         (y-or-n-p
           "Could not find `cargo' executable.
 Do you want to install the rust toolchain?")
 
-        (signal 'jirascope-compile-error "Compilation was cancelled"))))
+        (signal 'jirascope-dyn-get--compile-error "Compilation was cancelled"))))
   (if (or noninteractive
           (not (featurep 'jirascope-dyn))
           jirascope-dyn-get--force-sync)
@@ -356,7 +345,7 @@ Do you want to install the rust toolchain?")
 ;; ----------------------------------------------------------------------------
 ;; Generic mechanism.
 
-(defun jirascope--module-load-noerror (file)
+(defun jirascope-dyn-get--module-load-no-error (file)
   "Try loading `jirascope-dyn' from FILE.
 Return nil if the file does not exist, or is not a loadable shared library."
   (or (featurep 'jirascope-dyn)
@@ -373,32 +362,32 @@ Return nil if the file does not exist, or is not a loadable shared library."
 ;; value as variable is void: Ïúíþ".
 ;;
 ;; Therefore, we need to search for the file and use `module-load' directly.
-(defun jirascope-dyn--try-load-mac ()
+(defun jirascope-dyn-get--try-load-mac ()
   "Search and load the dynamic module on macOS."
   (let ((file "jirascope-dyn.dylib"))
     ;; Try directory containing `load-file-name'. Typical case. TODO: Remove
     ;; this special case.
     (when load-file-name
-      (jirascope--module-load-noerror (concat (file-name-directory load-file-name)
+      (jirascope-dyn-get--module-load-no-error (concat (file-name-directory load-file-name)
                                         file)))
     ;; Try working directory (e.g. when invoked by `cask'). TODO: Modifying load
     ;; path when using `cask' instead.
-    (jirascope--module-load-noerror file)
+    (jirascope-dyn-get--module-load-no-error file)
     ;; Fall back to `load-path'.
     (seq-find (lambda (dir)
                 (let ((full-name (concat (file-name-as-directory
                                           (expand-file-name dir))
                                          file)))
-                  (jirascope--module-load-noerror full-name)))
+                  (jirascope-dyn-get--module-load-no-error full-name)))
               load-path)))
 
-(defun jirascope-dyn--try-load ()
+(defun jirascope-dyn-get--try-load ()
   "Try loading `jirascope-dyn' without signaling an error.
 Return t on success, nil otherwise."
   (if (featurep 'jirascope-dyn)
       t
     (when (eq system-type 'darwin)
-      (jirascope-dyn--try-load-mac))
+      (jirascope-dyn-get--try-load-mac))
     (require 'jirascope-dyn nil :noerror)))
 
 ;; TODO: Add tests for this.
@@ -435,23 +424,23 @@ loaded, you will need to restart Emacs to load the new version."
            (recorded (if (version<= requested recorded)
                          (progn
                            (jirascope-dyn-get--log "Recorded version already satifies requested -> loading")
-                           (unless (jirascope-dyn--try-load)
+                           (unless (jirascope-dyn-get--try-load)
                              ;; The version file may have been accidentally deleted.
                              (jirascope-dyn-get--log "Could not load -> getting new")
                              (funcall get-new)
-                             (jirascope-dyn--try-load)))
+                             (jirascope-dyn-get--try-load)))
                        (jirascope-dyn-get--log "Recorded version is older than requested -> getting new")
                        (funcall get-new)
-                       (jirascope-dyn--try-load)))
+                       (jirascope-dyn-get--try-load)))
            (t (funcall get-new)
-              (jirascope-dyn--try-load)))
+              (jirascope-dyn-get--try-load)))
           (when (featurep 'jirascope-dyn)
             (cl-return)))))
     (if (and loaded (version< loaded requested))
         (jirascope-dyn-get--warn "Version %s is requested, but %s was already loaded. Please try restarting Emacs."
                            requested loaded)
       ;; Even if none of the sources worked, the module may still be there.
-      (jirascope-dyn--try-load)
+      (jirascope-dyn-get--try-load)
       (if-let ((loaded (jirascope-dyn-get--loaded-version)))
           (when (version< loaded requested)
             (jirascope-dyn-get--warn "Version %s is requested, but actual version after loading is %s."
