@@ -497,7 +497,7 @@ dependencies = [
 
 [[package]]
 name = "jirascope-dyn"
-version = "0.1.5"
+version = "0.2.0"
 dependencies = [
  "emacs",
  "jirascope-core",
