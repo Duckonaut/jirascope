@@ -39,6 +39,7 @@
         (url (format
                "https://github.com/Duckonaut/jirascope/releases/download/v%s/jirascope-dyn.so"
                version)))
+    (ignore url-request-method)
     (condition-case _
         (with-current-buffer (url-retrieve-synchronously url)
           (goto-char (point-min))
@@ -179,6 +180,7 @@ This function records the downloaded version in the manifest
                 "https://github.com/Duckonaut/jirascope/releases/download/v%s/%s"
                 version
                 remote-name)))
+    (ignore url-request-method)
     (jirascope-dyn-get--log "Downloading %s" url)
     (jirascope-dyn-get--url-copy-file url local-name :ok-if-already-exists)
     (with-temp-file jirascope-dyn-get--version-file
