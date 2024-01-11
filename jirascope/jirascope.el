@@ -71,101 +71,101 @@ Example setting:
 
 (defun jirascope-setup (url login api_token)
   "Setup Jirascope with the given cloud URL, LOGIN and API_TOKEN."
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-setup url login api_token)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-setup url login api_token)
+    (user-error jirascope--first-time-user-error)))
 
 ;; add bindings for interactive use
 (defun jirascope-issue-create ()
   "Create a new issue."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-issue-create-interactive)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-issue-create-interactive)
+    (user-error jirascope--first-time-user-error)))
 
 (defun jirascope-issue-display ()
   "Display an issue."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-issue-display-interactive)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-issue-display-interactive)
+    (user-error jirascope--first-time-user-error)))
 
 (defun jirascope-issue-edit ()
   "Edit an issue via prompt."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-issue-edit-interactive)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-issue-edit-interactive)
+    (user-error jirascope--first-time-user-error)))
 
 (defun jirascope-issue-edit-graphical ()
   "Edit an issue in a buffer."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-issue-edit-graphical-interactive)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-issue-edit-graphical-interactive)
+    (user-error jirascope--first-time-user-error)))
 
 (defun jirascope-issue-edit-finish ()
   "Finish editing an issue in a buffer and send it to the server."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-issue-edit-graphical-finish)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-issue-edit-graphical-finish)
+    (user-error jirascope--first-time-user-error)))
 
 (defun jirascope-issue-delete ()
   "Delete an issue."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-issue-delete-interactive)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-issue-delete-interactive)
+    (user-error jirascope--first-time-user-error)))
 
 (defun jirascope-issue-transition ()
   "Transition an issue."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-issue-transition-interactive)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-issue-transition-interactive)
+    (user-error jirascope--first-time-user-error)))
 
 (defun jirascope-project-create ()
   "Create a project via prompt."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-project-create-interactive)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-project-create-interactive)
+    (user-error jirascope--first-time-user-error)))
 
 (defun jirascope-project-edit ()
   "Edit a project via prompt."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-project-edit-interactive)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-project-edit-interactive)
+    (user-error jirascope--first-time-user-error)))
 
 (defun jirascope-project-edit-graphical ()
   "Edit a project in a buffer."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-project-edit-graphical-interactive)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-project-edit-graphical-interactive)
+    (user-error jirascope--first-time-user-error)))
 
 (defun jirascope-project-edit-finish ()
   "Finish editing a project in a buffer and send it to the server."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-project-edit-graphical-finish)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-project-edit-graphical-finish)
+    (user-error jirascope--first-time-user-error)))
 
 (defun jirascope-project-delete ()
   "Delete a project."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-project-delete-interactive)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-project-delete-interactive)
+    (user-error jirascope--first-time-user-error)))
 
 (defun jirascope-tree-open()
   "Open the project tree buffer."
   (interactive)
-  (unless (jirascope-dyn-get-installed)
-    (user-error jirascope--first-time-user-error)
-    (jirascope-dyn-state-open)))
+  (if (jirascope-dyn-get-installed)
+    (jirascope-dyn-state-open)
+    (user-error jirascope--first-time-user-error)))
 
 (defface jirascope-issue-key
   '((t (:inherit info-title-1)))
