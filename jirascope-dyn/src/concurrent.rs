@@ -1,7 +1,4 @@
-use std::{
-    collections::VecDeque,
-    sync::{atomic::AtomicUsize, RwLock},
-};
+use std::sync::OnceLock;
 
 use emacs::{defun, Env, IntoLisp, Value};
 
@@ -25,54 +22,48 @@ impl CommandEntry {
 
 // This is a bit of a hack. We have two queues, and we swap between them. This
 // lets us push further async commands while we're running the current queue.
-static mut COMMAND_QUEUE_A: RwLock<VecDeque<CommandEntry>> = RwLock::new(VecDeque::new());
-static mut COMMAND_QUEUE_B: RwLock<VecDeque<CommandEntry>> = RwLock::new(VecDeque::new());
-static COMMAND_QUEUE_INDEX: AtomicUsize = AtomicUsize::new(0);
+// static mut COMMAND_QUEUE_A: RwLock<VecDeque<CommandEntry>> = RwLock::new(VecDeque::new());
+// static mut COMMAND_QUEUE_B: RwLock<VecDeque<CommandEntry>> = RwLock::new(VecDeque::new());
+// static COMMAND_QUEUE_INDEX: AtomicUsize = AtomicUsize::new(0);
 
-fn swap_command_queues() {
-    COMMAND_QUEUE_INDEX.store(
-        1 - COMMAND_QUEUE_INDEX.load(std::sync::atomic::Ordering::Relaxed),
-        std::sync::atomic::Ordering::Relaxed,
-    );
-}
-
-fn current_command_queue() -> &'static RwLock<VecDeque<CommandEntry>> {
-    unsafe {
-        if COMMAND_QUEUE_INDEX.load(std::sync::atomic::Ordering::Relaxed) == 0 {
-            &COMMAND_QUEUE_A
-        } else {
-            &COMMAND_QUEUE_B
-        }
-    }
-}
+static mut COMMAND_QUEUE_RECEIVER: OnceLock<std::sync::mpsc::Receiver<CommandEntry>> =
+    OnceLock::new();
+static mut COMMAND_QUEUE_SENDER: OnceLock<std::sync::mpsc::Sender<CommandEntry>> = OnceLock::new();
 
 pub(crate) fn push_command(callback: Box<Command>) {
-    current_command_queue()
-        .write()
-        .unwrap()
-        .push_back(CommandEntry::new(callback));
-}
+    println!("Pushing command");
+    let sender = unsafe { COMMAND_QUEUE_SENDER.get().cloned().unwrap() };
+    println!("Pushing command");
 
-pub(crate) fn flush_commands(env: &Env) -> emacs::Result<()> {
-    let mut queue = current_command_queue().write().unwrap();
-    swap_command_queues();
-    while let Some(entry) = queue.pop_front() {
-        entry.run(env)?;
-    }
-    Ok(())
+    sender.send(CommandEntry::new(callback)).unwrap();
 }
 
 #[defun]
 fn event_handler(env: &Env) -> emacs::Result<()> {
+    let receiver = unsafe { COMMAND_QUEUE_RECEIVER.get().unwrap() };
+    loop {
+        match receiver.try_recv() {
+            Ok(entry) => entry.run(env)?,
+            Err(std::sync::mpsc::TryRecvError::Empty) => break,
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                panic!("Command queue disconnected");
+            }
+        }
+    }
     if utils::workthread_count() > 0 {
         env.message("[jirascope] Task running...")?;
     }
 
-    flush_commands(env)
+    Ok(())
 }
 
 #[defun]
 pub(crate) fn install_handler(env: &Env) -> emacs::Result<Value<'_>> {
+    unsafe {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        COMMAND_QUEUE_RECEIVER.set(receiver).unwrap();
+        COMMAND_QUEUE_SENDER.set(sender).unwrap();
+    }
     env.call(
         "run-with-timer",
         [
