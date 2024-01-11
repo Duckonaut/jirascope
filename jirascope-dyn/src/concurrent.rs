@@ -1,8 +1,6 @@
-use std::sync::OnceLock;
+use std::sync::{atomic::AtomicUsize, OnceLock};
 
 use emacs::{defun, Env, IntoLisp, Value};
-
-use crate::utils;
 
 pub(crate) type Command = dyn FnOnce(&Env) -> emacs::Result<()> + Send + 'static;
 
@@ -19,12 +17,6 @@ impl CommandEntry {
         (self.callback)(env)
     }
 }
-
-// This is a bit of a hack. We have two queues, and we swap between them. This
-// lets us push further async commands while we're running the current queue.
-// static mut COMMAND_QUEUE_A: RwLock<VecDeque<CommandEntry>> = RwLock::new(VecDeque::new());
-// static mut COMMAND_QUEUE_B: RwLock<VecDeque<CommandEntry>> = RwLock::new(VecDeque::new());
-// static COMMAND_QUEUE_INDEX: AtomicUsize = AtomicUsize::new(0);
 
 static mut COMMAND_QUEUE_RECEIVER: OnceLock<std::sync::mpsc::Receiver<CommandEntry>> =
     OnceLock::new();
@@ -48,7 +40,7 @@ fn event_handler(env: &Env) -> emacs::Result<()> {
             }
         }
     }
-    if utils::workthread_count() > 0 {
+    if workthread_count() > 0 {
         env.message("[jirascope] Task running...")?;
     }
 
@@ -70,4 +62,28 @@ pub(crate) fn install_handler(env: &Env) -> emacs::Result<Value<'_>> {
             env.intern("jirascope-dyn-concurrent-event-handler")?,
         ],
     )
+}
+
+static WORKTHREAD_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+pub fn workthread_panic_cleanup() {
+    WORKTHREAD_COUNTER.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+}
+
+pub fn workthread_spawn<T: Send + 'static>(
+    f: impl FnOnce() -> T + Send + 'static,
+) -> std::thread::JoinHandle<T> {
+    WORKTHREAD_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+    std::thread::spawn(move || {
+        let result = f();
+
+        WORKTHREAD_COUNTER.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+
+        result
+    })
+}
+
+pub fn workthread_count() -> usize {
+    WORKTHREAD_COUNTER.load(std::sync::atomic::Ordering::SeqCst)
 }

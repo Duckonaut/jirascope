@@ -5,12 +5,12 @@ use jirascope_core::jira::{
 };
 
 use crate::{
-    concurrent, get_jirascope, project,
+    concurrent::{self, workthread_spawn}, get_jirascope, project,
     state::{self, get_state, ConflictCell},
     utils::{
         self, close_jirascope_diff_buffer, current_buffer_face_println, current_buffer_println,
         get_jirascope_buffer_content, open_jirascope_buffer, open_jirascope_diff_buffer,
-        prompt_force_change, signal_result, signal_result_async, with_buffer, workthread_spawn,
+        prompt_force_change, signal_result, signal_result_async, with_buffer,
         ScopeCleaner, JIRASCOPE_FACE_DIFF_ALERT, JIRASCOPE_FACE_DIFF_NEW, JIRASCOPE_FACE_DIFF_OLD,
     },
     JIRASCOPE_DIFF_BUFFER_NAME,
