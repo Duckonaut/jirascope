@@ -31,9 +31,7 @@ static mut COMMAND_QUEUE_RECEIVER: OnceLock<std::sync::mpsc::Receiver<CommandEnt
 static mut COMMAND_QUEUE_SENDER: OnceLock<std::sync::mpsc::Sender<CommandEntry>> = OnceLock::new();
 
 pub(crate) fn push_command(callback: Box<Command>) {
-    println!("Pushing command");
     let sender = unsafe { COMMAND_QUEUE_SENDER.get().cloned().unwrap() };
-    println!("Pushing command");
 
     sender.send(CommandEntry::new(callback)).unwrap();
 }
