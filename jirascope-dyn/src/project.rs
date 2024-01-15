@@ -11,7 +11,7 @@ use crate::{
         self, close_jirascope_diff_buffer, current_buffer_face_println, current_buffer_println,
         get_jirascope_buffer_content, open_jirascope_buffer, open_jirascope_diff_buffer,
         prompt_force_change, signal_result, signal_result_async, with_buffer,
-        JIRASCOPE_FACE_DIFF_ALERT, JIRASCOPE_FACE_DIFF_NEW, JIRASCOPE_FACE_DIFF_OLD,
+        JIRASCOPE_FACE_DIFF_ALERT, JIRASCOPE_FACE_DIFF_NEW, JIRASCOPE_FACE_DIFF_OLD, set_buffer_mode, JirascopeBufferMode,
     },
     JIRASCOPE_DIFF_BUFFER_NAME,
 };
@@ -336,6 +336,8 @@ fn edit_graphical(env: &Env, key: String) -> Result<()> {
     }
 
     current_buffer_println(env, &format!("Lead: {}", project.lead.display_name))?;
+
+    set_buffer_mode(env, JirascopeBufferMode::ProjectEdit)?;
 
     Ok(())
 }

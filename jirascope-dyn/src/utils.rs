@@ -361,6 +361,7 @@ pub enum JirascopeBufferMode {
     Project,
     Tree,
     IssueEdit,
+    ProjectEdit,
 }
 
 static JIRASCOPE_BUFFER_MODE: Mutex<JirascopeBufferMode> = Mutex::new(JirascopeBufferMode::Issue);
