@@ -315,10 +315,6 @@ compilation process."
 If DIR is nil, use `jirascope-dyn-get--dir'.
 Otherwise, use DIR as the build directory.
 
-When called during an attempt to load `jirascope', or in batch mode,
-this blocks until compilation finishes. In other situations, it runs
-in the background.
-
 This function records the built version in the manifest
 `jirascope-dyn-get--version-file'.
 
@@ -342,7 +338,7 @@ Do you want to install the rust toolchain?")
     ;; TODO: Notify user for further actions. If `jirascope' has not been loaded,
     ;; offer to load it. If it has already been loaded, offer to restart Emacs
     ;; to be able to load the newly built `jirascope-dyn'.
-    (jirascope-dyn-get--build-async dir)))
+    (jirascope-dyn-get--build-sync dir)))
 
 ;; ----------------------------------------------------------------------------
 ;; Generic mechanism.
