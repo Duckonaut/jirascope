@@ -52,14 +52,14 @@
   "Return t if we can build the dynamic module, nil otherwise."
   (executable-find "cargo"))
 
-(defun jirascope-dyn-get-available ()
-  "Returns t if we either a valid `jirascope-dyn' binary or can build/fetch one."
+(defun jirascope-dyn-get-available (version)
+  "Returns t if we either a valid `jirascope-dyn' binary or can build/fetch one with VERSION."
   ;; Check if we have a valid binary.
   (or (jirascope-dyn-get--try-load)
       ;; check if we have internet connectivity.
       (and (jirascope-dyn-get--internet-connectivity)
            ;; check if we can build/fetch a binary.
-           (or (jirascope-dyn-get--can-fetch (jirascope-dyn-get--recorded-version))
+           (or (jirascope-dyn-get--can-fetch (version))
                (jirascope-dyn-get--can-build)))))
 
 (defun jirascope-dyn-get-installed ()
@@ -72,7 +72,7 @@
 
 (defun jirascope-dyn-get-install (version)
   "Install the dynamic module `jirascope-dyn' with VERSION."
-  (if (jirascope-dyn-get-available)
+  (if (jirascope-dyn-get-available version)
     (jirascope-dyn-get-ensure version)
     (error "No viable installation method found")))
 
