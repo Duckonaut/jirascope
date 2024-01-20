@@ -21,7 +21,7 @@
 (unless (functionp 'module-load)
   (error "Dynamic module feature not available, please compile Emacs --with-modules option turned on"))
 
-(defconst jirascope--dyn-version "0.1.4"
+(defconst jirascope--dyn-version "0.2.0"
   "Required version of the dynamic module `jirascope-dyn'.")
 
 (defconst jirascope--first-time-user-error "First time using jirascope/binary is missing. Please run `jirascope-install' to install it"
