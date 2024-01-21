@@ -183,6 +183,69 @@ impl Content {
                 }
                 writeln!(writer)
             }
+            "orderedList" => {
+                if let Some(content) = &self.content {
+                    for (i, content) in content.iter().enumerate() {
+                        write!(writer, "{}. ", i + 1)?;
+                        content.to_markdown(writer)?;
+                    }
+                }
+                Ok(())
+            }
+            "bulletList" => {
+                if let Some(content) = &self.content {
+                    for content in content {
+                        write!(writer, "* ")?;
+                        content.to_markdown(writer)?;
+                    }
+                }
+                Ok(())
+            }
+            "table" => {
+                if let Some(content) = &self.content {
+                    let first_row_lens = content
+                        .first()
+                        .unwrap()
+                        .content
+                        .as_ref()
+                        .unwrap()
+                        .iter()
+                        .map(|row| {
+                            let mut s: String = String::new();
+                            row.to_markdown(&mut s).unwrap();
+                            s.len()
+                        })
+                        .collect::<Vec<usize>>();
+
+                    for (i, content) in content.iter().enumerate() {
+                        content.to_markdown(writer)?;
+                        if i == 0 {
+                            write!(writer, "|")?;
+                            for len in &first_row_lens {
+                                write!(writer, "{}|", "-".repeat(*len+2))?;
+                            }
+                            writeln!(writer)?;
+                        }
+                    }
+                }
+                Ok(())
+            }
+            "tableRow" => {
+                if let Some(content) = &self.content {
+                    let content_len = content.len();
+                    write!(writer, "| ")?;
+                    for (i, content) in content.iter().enumerate() {
+                        content.to_markdown(writer)?;
+                        if i < content_len - 1 {
+                            write!(writer, " | ")?;
+                        }
+                    }
+                    writeln!(writer, " |")?;
+                }
+                Ok(())
+            }
+            "rule" => writeln!(writer, "\n---\n"),
+            "hardBreak" => writeln!(writer),
             _ => self.standard_to_markdown(writer),
         }
     }
@@ -242,13 +305,6 @@ impl Content {
                     }
                 }
             }
-            markdown::mdast::Node::Break(_) => Content {
-                type_: "hardBreak".to_string(),
-                content: None,
-                text: None,
-                marks: None,
-                attrs: None,
-            },
             markdown::mdast::Node::InlineCode(ic) => Content {
                 type_: "text".to_string(),
                 content: None,
@@ -507,7 +563,7 @@ impl Content {
     /// }
     /// ```
     pub fn flatten(mut self) -> Vec<Self> {
-        if self.inline() && self.content.is_some() {
+        if self.should_flatten() {
             let mut flattened = Vec::new();
             for child in self.content.unwrap() {
                 let c = child.flatten();
@@ -539,12 +595,26 @@ impl Content {
         }
     }
 
-    /// Returns true if the content is inline
     pub fn inline(&self) -> bool {
         matches!(
             self.type_.as_str(),
-            "text" | "code" | "inlineCard" | "mention" | "emoji"
+            "text"
+                | "code"
+                | "inlineCard"
+                | "mention"
+                | "emoji"
+                | "listItem"
+                | "tableCell"
+                | "tableRow"
+                | "table"
         )
+    }
+
+    pub fn should_flatten(&self) -> bool {
+        matches!(
+            self.type_.as_str(),
+            "text" | "code" | "inlineCard" | "mention" | "emoji"
+        ) && self.content.is_some()
     }
 }
 
@@ -702,6 +772,271 @@ mod tests {
                     marks: None,
                     attrs: None,
                 }],
+            }
+        );
+    }
+
+    #[test]
+    fn strikethrough_to_markdown() {
+        let doc = AtlassianDoc {
+            version: 1,
+            type_: "doc".to_string(),
+            content: vec![Content {
+                type_: "paragraph".to_string(),
+                content: Some(vec![Content {
+                    type_: "text".to_string(),
+                    content: None,
+                    text: Some("Hello, world!".to_string()),
+                    marks: Some(vec![Mark {
+                        type_: "strike".to_string(),
+                        attrs: None,
+                    }]),
+                    attrs: None,
+                }]),
+                text: None,
+                marks: None,
+                attrs: None,
+            }],
+        };
+        assert_eq!(doc.to_markdown(), "~~Hello, world!~~\n");
+    }
+
+    #[test]
+    fn strikethrough_from_markdown() {
+        let doc = AtlassianDoc::from_markdown("~~Hello, world!~~");
+        assert_eq!(
+            doc,
+            AtlassianDoc {
+                version: 1,
+                type_: "doc".to_string(),
+                content: vec![Content {
+                    type_: "paragraph".to_string(),
+                    content: Some(vec![Content {
+                        type_: "text".to_string(),
+                        content: None,
+                        text: Some("Hello, world!".to_string()),
+                        marks: Some(vec![Mark {
+                            type_: "strike".to_string(),
+                            attrs: None,
+                        }]),
+                        attrs: None,
+                    }]),
+                    text: None,
+                    marks: None,
+                    attrs: None,
+                }],
+            }
+        );
+    }
+
+    #[test]
+    fn stacked_marks_from_markdown() {
+        let doc = AtlassianDoc::from_markdown("***Hello**, ~~world!~~*");
+        assert_eq!(
+            doc,
+            AtlassianDoc {
+                version: 1,
+                type_: "doc".to_string(),
+                content: vec![Content {
+                    type_: "paragraph".to_string(),
+                    content: Some(vec![
+                        Content {
+                            type_: "text".to_string(),
+                            content: None,
+                            text: Some("Hello".to_string()),
+                            marks: Some(vec![
+                                Mark {
+                                    type_: "strong".to_string(),
+                                    attrs: None,
+                                },
+                                Mark {
+                                    type_: "em".to_string(),
+                                    attrs: None,
+                                },
+                            ]),
+                            attrs: None,
+                        },
+                        Content {
+                            type_: "text".to_string(),
+                            content: None,
+                            text: Some(", ".to_string()),
+                            marks: Some(vec![Mark {
+                                type_: "em".to_string(),
+                                attrs: None,
+                            }]),
+                            attrs: None,
+                        },
+                        Content {
+                            type_: "text".to_string(),
+                            content: None,
+                            text: Some("world!".to_string()),
+                            marks: Some(vec![
+                                Mark {
+                                    type_: "strike".to_string(),
+                                    attrs: None,
+                                },
+                                Mark {
+                                    type_: "em".to_string(),
+                                    attrs: None,
+                                },
+                            ]),
+                            attrs: None,
+                        },
+                    ]),
+                    text: None,
+                    marks: None,
+                    attrs: None,
+                }],
+            }
+        );
+    }
+
+    #[test]
+    fn stacked_marks_to_markdown() {
+        let doc = AtlassianDoc {
+            version: 1,
+            type_: "doc".to_string(),
+            content: vec![Content {
+                type_: "paragraph".to_string(),
+                content: Some(vec![
+                    Content {
+                        type_: "text".to_string(),
+                        content: None,
+                        text: Some("Hello".to_string()),
+                        marks: Some(vec![
+                            Mark {
+                                type_: "strong".to_string(),
+                                attrs: None,
+                            },
+                            Mark {
+                                type_: "em".to_string(),
+                                attrs: None,
+                            },
+                        ]),
+                        attrs: None,
+                    },
+                    Content {
+                        type_: "text".to_string(),
+                        content: None,
+                        text: Some(", ".to_string()),
+                        marks: Some(vec![Mark {
+                            type_: "em".to_string(),
+                            attrs: None,
+                        }]),
+                        attrs: None,
+                    },
+                    Content {
+                        type_: "text".to_string(),
+                        content: None,
+                        text: Some("world!".to_string()),
+                        marks: Some(vec![
+                            Mark {
+                                type_: "strike".to_string(),
+                                attrs: None,
+                            },
+                            Mark {
+                                type_: "em".to_string(),
+                                attrs: None,
+                            },
+                        ]),
+                        attrs: None,
+                    },
+                ]),
+                text: None,
+                marks: None,
+                attrs: None,
+            }],
+        };
+        assert_eq!(doc.to_markdown(), "***Hello****, *~~*world!*~~\n");
+    }
+
+    #[test]
+    fn thematic_break_to_markdown() {
+        let doc = AtlassianDoc {
+            version: 1,
+            type_: "doc".to_string(),
+            content: vec![
+                Content {
+                    type_: "paragraph".to_string(),
+                    content: Some(vec![Content {
+                        type_: "text".to_string(),
+                        content: None,
+                        text: Some("Hello".to_string()),
+                        marks: None,
+                        attrs: None,
+                    }]),
+                    text: None,
+                    marks: None,
+                    attrs: None,
+                },
+                Content {
+                    type_: "rule".to_string(),
+                    content: None,
+                    text: None,
+                    marks: None,
+                    attrs: None,
+                },
+                Content {
+                    type_: "paragraph".to_string(),
+                    content: Some(vec![Content {
+                        type_: "text".to_string(),
+                        content: None,
+                        text: Some("world!".to_string()),
+                        marks: None,
+                        attrs: None,
+                    }]),
+                    text: None,
+                    marks: None,
+                    attrs: None,
+                },
+            ],
+        };
+        assert_eq!(doc.to_markdown(), "Hello\n\n---\n\nworld!\n");
+    }
+
+    #[test]
+    fn thematic_break_from_markdown() {
+        let doc = AtlassianDoc::from_markdown("Hello\n\n---\n\nworld!\n");
+        assert_eq!(
+            doc,
+            AtlassianDoc {
+                version: 1,
+                type_: "doc".to_string(),
+                content: vec![
+                    Content {
+                        type_: "paragraph".to_string(),
+                        content: Some(vec![Content {
+                            type_: "text".to_string(),
+                            content: None,
+                            text: Some("Hello".to_string()),
+                            marks: None,
+                            attrs: None,
+                        }]),
+                        text: None,
+                        marks: None,
+                        attrs: None,
+                    },
+                    Content {
+                        type_: "rule".to_string(),
+                        content: None,
+                        text: None,
+                        marks: None,
+                        attrs: None,
+                    },
+                    Content {
+                        type_: "paragraph".to_string(),
+                        content: Some(vec![Content {
+                            type_: "text".to_string(),
+                            content: None,
+                            text: Some("world!".to_string()),
+                            marks: None,
+                            attrs: None,
+                        }]),
+                        text: None,
+                        marks: None,
+                        attrs: None,
+                    },
+                ],
             }
         );
     }
@@ -905,59 +1240,6 @@ mod tests {
             }],
         };
         assert_eq!(doc.to_markdown(), "> Hello, world!\n> Hello, world!\n");
-    }
-
-    #[test]
-    fn strikethrough_to_markdown() {
-        let doc = AtlassianDoc {
-            version: 1,
-            type_: "doc".to_string(),
-            content: vec![Content {
-                type_: "paragraph".to_string(),
-                content: Some(vec![Content {
-                    type_: "text".to_string(),
-                    content: None,
-                    text: Some("Hello, world!".to_string()),
-                    marks: Some(vec![Mark {
-                        type_: "strike".to_string(),
-                        attrs: None,
-                    }]),
-                    attrs: None,
-                }]),
-                text: None,
-                marks: None,
-                attrs: None,
-            }],
-        };
-        assert_eq!(doc.to_markdown(), "~~Hello, world!~~\n");
-    }
-
-    #[test]
-    fn strikethrough_from_markdown() {
-        let doc = AtlassianDoc::from_markdown("~~Hello, world!~~");
-        assert_eq!(
-            doc,
-            AtlassianDoc {
-                version: 1,
-                type_: "doc".to_string(),
-                content: vec![Content {
-                    type_: "paragraph".to_string(),
-                    content: Some(vec![Content {
-                        type_: "text".to_string(),
-                        content: None,
-                        text: Some("Hello, world!".to_string()),
-                        marks: Some(vec![Mark {
-                            type_: "strike".to_string(),
-                            attrs: None,
-                        }]),
-                        attrs: None,
-                    }]),
-                    text: None,
-                    marks: None,
-                    attrs: None,
-                }],
-            }
-        );
     }
 
     #[test]
@@ -1312,6 +1594,749 @@ mod tests {
                     },
                 ],
             }
+        );
+    }
+
+    #[test]
+    fn ordered_list_from_markdown() {
+        let doc =
+            AtlassianDoc::from_markdown("1. Hello, world!\n2. Hello, world!\n3. Hello, world!\n");
+        assert_eq!(
+            doc,
+            AtlassianDoc {
+                version: 1,
+                type_: "doc".to_string(),
+                content: vec![Content {
+                    type_: "orderedList".to_string(),
+                    content: Some(vec![
+                        Content {
+                            type_: "listItem".to_string(),
+                            content: Some(vec![Content {
+                                type_: "paragraph".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("Hello, world!".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        },
+                        Content {
+                            type_: "listItem".to_string(),
+                            content: Some(vec![Content {
+                                type_: "paragraph".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("Hello, world!".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        },
+                        Content {
+                            type_: "listItem".to_string(),
+                            content: Some(vec![Content {
+                                type_: "paragraph".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("Hello, world!".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        },
+                    ]),
+                    text: None,
+                    marks: None,
+                    attrs: None,
+                },],
+            }
+        );
+    }
+
+    #[test]
+    fn ordered_list_to_markdown() {
+        let doc = AtlassianDoc {
+            version: 1,
+            type_: "doc".to_string(),
+            content: vec![Content {
+                type_: "orderedList".to_string(),
+                content: Some(vec![
+                    Content {
+                        type_: "listItem".to_string(),
+                        content: Some(vec![Content {
+                            type_: "paragraph".to_string(),
+                            content: Some(vec![Content {
+                                type_: "text".to_string(),
+                                content: None,
+                                text: Some("Hello, world!".to_string()),
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        }]),
+                        text: None,
+                        marks: None,
+                        attrs: None,
+                    },
+                    Content {
+                        type_: "listItem".to_string(),
+                        content: Some(vec![Content {
+                            type_: "paragraph".to_string(),
+                            content: Some(vec![Content {
+                                type_: "text".to_string(),
+                                content: None,
+                                text: Some("Hello, world!".to_string()),
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        }]),
+                        text: None,
+                        marks: None,
+                        attrs: None,
+                    },
+                    Content {
+                        type_: "listItem".to_string(),
+                        content: Some(vec![Content {
+                            type_: "paragraph".to_string(),
+                            content: Some(vec![Content {
+                                type_: "text".to_string(),
+                                content: None,
+                                text: Some("Hello, world!".to_string()),
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        }]),
+                        text: None,
+                        marks: None,
+                        attrs: None,
+                    },
+                ]),
+                text: None,
+                marks: None,
+                attrs: None,
+            }],
+        };
+        assert_eq!(
+            doc.to_markdown(),
+            "1. Hello, world!\n2. Hello, world!\n3. Hello, world!\n"
+        );
+    }
+
+    #[test]
+    fn bullet_list_from_markdown() {
+        let doc =
+            AtlassianDoc::from_markdown("* Hello, world!\n* Hello, world!\n* Hello, world!\n");
+        assert_eq!(
+            doc,
+            AtlassianDoc {
+                version: 1,
+                type_: "doc".to_string(),
+                content: vec![Content {
+                    type_: "bulletList".to_string(),
+                    content: Some(vec![
+                        Content {
+                            type_: "listItem".to_string(),
+                            content: Some(vec![Content {
+                                type_: "paragraph".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("Hello, world!".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        },
+                        Content {
+                            type_: "listItem".to_string(),
+                            content: Some(vec![Content {
+                                type_: "paragraph".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("Hello, world!".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        },
+                        Content {
+                            type_: "listItem".to_string(),
+                            content: Some(vec![Content {
+                                type_: "paragraph".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("Hello, world!".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        },
+                    ]),
+                    text: None,
+                    marks: None,
+                    attrs: None,
+                },],
+            }
+        );
+    }
+
+    #[test]
+    fn bullet_list_to_markdown() {
+        let doc = AtlassianDoc {
+            version: 1,
+            type_: "doc".to_string(),
+            content: vec![Content {
+                type_: "bulletList".to_string(),
+                content: Some(vec![
+                    Content {
+                        type_: "listItem".to_string(),
+                        content: Some(vec![Content {
+                            type_: "paragraph".to_string(),
+                            content: Some(vec![Content {
+                                type_: "text".to_string(),
+                                content: None,
+                                text: Some("Hello, world!".to_string()),
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        }]),
+                        text: None,
+                        marks: None,
+                        attrs: None,
+                    },
+                    Content {
+                        type_: "listItem".to_string(),
+                        content: Some(vec![Content {
+                            type_: "paragraph".to_string(),
+                            content: Some(vec![Content {
+                                type_: "text".to_string(),
+                                content: None,
+                                text: Some("Hello, world!".to_string()),
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        }]),
+                        text: None,
+                        marks: None,
+                        attrs: None,
+                    },
+                    Content {
+                        type_: "listItem".to_string(),
+                        content: Some(vec![Content {
+                            type_: "paragraph".to_string(),
+                            content: Some(vec![Content {
+                                type_: "text".to_string(),
+                                content: None,
+                                text: Some("Hello, world!".to_string()),
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        }]),
+                        text: None,
+                        marks: None,
+                        attrs: None,
+                    },
+                ]),
+                text: None,
+                marks: None,
+                attrs: None,
+            }],
+        };
+        assert_eq!(
+            doc.to_markdown(),
+            "* Hello, world!\n* Hello, world!\n* Hello, world!\n"
+        );
+    }
+
+    #[test]
+    fn nested_list_from_markdown() {
+        let doc = AtlassianDoc::from_markdown(
+            "* Hello, world!\n\t* Hello, world!\n\t* Hello, world!\n* Hello, world!\n",
+        );
+        assert_eq!(
+            doc,
+            AtlassianDoc {
+                version: 1,
+                type_: "doc".to_string(),
+                content: vec![Content {
+                    type_: "bulletList".to_string(),
+                    content: Some(vec![
+                        Content {
+                            type_: "listItem".to_string(),
+                            content: Some(vec![
+                                Content {
+                                    type_: "paragraph".to_string(),
+                                    content: Some(vec![Content {
+                                        type_: "text".to_string(),
+                                        content: None,
+                                        text: Some("Hello, world!".to_string()),
+                                        marks: None,
+                                        attrs: None,
+                                    }]),
+                                    text: None,
+                                    marks: None,
+                                    attrs: None,
+                                },
+                                Content {
+                                    type_: "bulletList".to_string(),
+                                    content: Some(vec![
+                                        Content {
+                                            type_: "listItem".to_string(),
+                                            content: Some(vec![Content {
+                                                type_: "paragraph".to_string(),
+                                                content: Some(vec![Content {
+                                                    type_: "text".to_string(),
+                                                    content: None,
+                                                    text: Some("Hello, world!".to_string()),
+                                                    marks: None,
+                                                    attrs: None,
+                                                }]),
+                                                text: None,
+                                                marks: None,
+                                                attrs: None,
+                                            }]),
+                                            text: None,
+                                            marks: None,
+                                            attrs: None,
+                                        },
+                                        Content {
+                                            type_: "listItem".to_string(),
+                                            content: Some(vec![Content {
+                                                type_: "paragraph".to_string(),
+                                                content: Some(vec![Content {
+                                                    type_: "text".to_string(),
+                                                    content: None,
+                                                    text: Some("Hello, world!".to_string()),
+                                                    marks: None,
+                                                    attrs: None,
+                                                }]),
+                                                text: None,
+                                                marks: None,
+                                                attrs: None,
+                                            }]),
+                                            text: None,
+                                            marks: None,
+                                            attrs: None,
+                                        },
+                                    ]),
+                                    text: None,
+                                    marks: None,
+                                    attrs: None,
+                                }
+                            ]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        },
+                        Content {
+                            type_: "listItem".to_string(),
+                            content: Some(vec![Content {
+                                type_: "paragraph".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("Hello, world!".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            }]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        },
+                    ]),
+                    text: None,
+                    marks: None,
+                    attrs: None,
+                }]
+            }
+        );
+    }
+
+    #[test]
+    fn table_from_markdown() {
+        let doc = AtlassianDoc::from_markdown(
+            "| A | B | C |\n| --- | --- | --- |\n| 1 | 2 | 3 |\n| 4 | 5 | 6 |\n",
+        );
+        dbg!(&doc);
+        assert_eq!(
+            doc,
+            AtlassianDoc {
+                version: 1,
+                type_: "doc".to_string(),
+                content: vec![Content {
+                    type_: "table".to_string(),
+                    content: Some(vec![
+                        Content {
+                            type_: "tableRow".to_string(),
+                            content: Some(vec![
+                                Content {
+                                    type_: "tableCell".to_string(),
+                                    content: Some(vec![Content {
+                                        type_: "text".to_string(),
+                                        content: None,
+                                        text: Some("A".to_string()),
+                                        marks: None,
+                                        attrs: None,
+                                    }]),
+                                    text: None,
+                                    marks: None,
+                                    attrs: None,
+                                },
+                                Content {
+                                    type_: "tableCell".to_string(),
+                                    content: Some(vec![Content {
+                                        type_: "text".to_string(),
+                                        content: None,
+                                        text: Some("B".to_string()),
+                                        marks: None,
+                                        attrs: None,
+                                    }]),
+                                    text: None,
+                                    marks: None,
+                                    attrs: None,
+                                },
+                                Content {
+                                    type_: "tableCell".to_string(),
+                                    content: Some(vec![Content {
+                                        type_: "text".to_string(),
+                                        content: None,
+                                        text: Some("C".to_string()),
+                                        marks: None,
+                                        attrs: None,
+                                    }]),
+                                    text: None,
+                                    marks: None,
+                                    attrs: None,
+                                },
+                            ]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        },
+                        Content {
+                            type_: "tableRow".to_string(),
+                            content: Some(vec![
+                                Content {
+                                    type_: "tableCell".to_string(),
+                                    content: Some(vec![Content {
+                                        type_: "text".to_string(),
+                                        content: None,
+                                        text: Some("1".to_string()),
+                                        marks: None,
+                                        attrs: None,
+                                    }]),
+                                    text: None,
+                                    marks: None,
+                                    attrs: None,
+                                },
+                                Content {
+                                    type_: "tableCell".to_string(),
+                                    content: Some(vec![Content {
+                                        type_: "text".to_string(),
+                                        content: None,
+                                        text: Some("2".to_string()),
+                                        marks: None,
+                                        attrs: None,
+                                    }]),
+                                    text: None,
+                                    marks: None,
+                                    attrs: None,
+                                },
+                                Content {
+                                    type_: "tableCell".to_string(),
+                                    content: Some(vec![Content {
+                                        type_: "text".to_string(),
+                                        content: None,
+                                        text: Some("3".to_string()),
+                                        marks: None,
+                                        attrs: None,
+                                    }]),
+                                    text: None,
+                                    marks: None,
+                                    attrs: None,
+                                },
+                            ]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        },
+                        Content {
+                            type_: "tableRow".to_string(),
+                            content: Some(vec![
+                                Content {
+                                    type_: "tableCell".to_string(),
+                                    content: Some(vec![Content {
+                                        type_: "text".to_string(),
+                                        content: None,
+                                        text: Some("4".to_string()),
+                                        marks: None,
+                                        attrs: None,
+                                    }]),
+                                    text: None,
+                                    marks: None,
+                                    attrs: None,
+                                },
+                                Content {
+                                    type_: "tableCell".to_string(),
+                                    content: Some(vec![Content {
+                                        type_: "text".to_string(),
+                                        content: None,
+                                        text: Some("5".to_string()),
+                                        marks: None,
+                                        attrs: None,
+                                    }]),
+                                    text: None,
+                                    marks: None,
+                                    attrs: None,
+                                },
+                                Content {
+                                    type_: "tableCell".to_string(),
+                                    content: Some(vec![Content {
+                                        type_: "text".to_string(),
+                                        content: None,
+                                        text: Some("6".to_string()),
+                                        marks: None,
+                                        attrs: None,
+                                    }]),
+                                    text: None,
+                                    marks: None,
+                                    attrs: None,
+                                },
+                            ]),
+                            text: None,
+                            marks: None,
+                            attrs: None,
+                        },
+                    ]),
+                    text: None,
+                    marks: None,
+                    attrs: None,
+                },],
+            }
+        );
+    }
+
+    #[test]
+    fn table_to_markdown() {
+        let doc = AtlassianDoc {
+            version: 1,
+            type_: "doc".to_string(),
+            content: vec![Content {
+                type_: "table".to_string(),
+                content: Some(vec![
+                    Content {
+                        type_: "tableRow".to_string(),
+                        content: Some(vec![
+                            Content {
+                                type_: "tableCell".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("A".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            },
+                            Content {
+                                type_: "tableCell".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("B".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            },
+                            Content {
+                                type_: "tableCell".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("C".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            },
+                        ]),
+                        text: None,
+                        marks: None,
+                        attrs: None,
+                    },
+                    Content {
+                        type_: "tableRow".to_string(),
+                        content: Some(vec![
+                            Content {
+                                type_: "tableCell".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("1".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            },
+                            Content {
+                                type_: "tableCell".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("2".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            },
+                            Content {
+                                type_: "tableCell".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("3".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            },
+                        ]),
+                        text: None,
+                        marks: None,
+                        attrs: None,
+                    },
+                    Content {
+                        type_: "tableRow".to_string(),
+                        content: Some(vec![
+                            Content {
+                                type_: "tableCell".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("4".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            },
+                            Content {
+                                type_: "tableCell".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("5".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            },
+                            Content {
+                                type_: "tableCell".to_string(),
+                                content: Some(vec![Content {
+                                    type_: "text".to_string(),
+                                    content: None,
+                                    text: Some("6".to_string()),
+                                    marks: None,
+                                    attrs: None,
+                                }]),
+                                text: None,
+                                marks: None,
+                                attrs: None,
+                            },
+                        ]),
+                        text: None,
+                        marks: None,
+                        attrs: None,
+                    },
+                ]),
+                text: None,
+                marks: None,
+                attrs: None,
+            }],
+        };
+        assert_eq!(
+            doc.to_markdown(),
+            "| A | B | C |\n|---|---|---|\n| 1 | 2 | 3 |\n| 4 | 5 | 6 |\n"
         );
     }
 }
