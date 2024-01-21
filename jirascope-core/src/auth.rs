@@ -42,3 +42,33 @@ impl Auth {
         request.set("Authorization", format!("Basic {}", self.get_basic_auth()).as_str())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic_auth() {
+        let mut auth = Auth::new("username", "api_token");
+        assert_eq!(auth.get_basic_auth(), "dXNlcm5hbWU6YXBpX3Rva2Vu");
+    }
+
+    #[test]
+    fn auth() {
+        let mut auth = Auth::new("username", "api_token");
+        let request = ureq::get("https://example.com");
+        let request = auth.auth(request);
+        assert_eq!(request.header("Authorization").unwrap(), "Basic dXNlcm5hbWU6YXBpX3Rva2Vu");
+    }
+
+    #[test]
+    fn auth_with_login() {
+        let mut auth = Auth::new("username", "api_token");
+        let config = Config::new("https://example.atlassian.net");
+        auth.login(&config).unwrap();
+
+        let request = ureq::get("https://example.com");
+        let request = auth.auth(request);
+        assert_eq!(request.header("Authorization").unwrap(), "Basic dXNlcm5hbWU6YXBpX3Rva2Vu");
+    }
+}

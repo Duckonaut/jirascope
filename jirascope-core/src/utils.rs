@@ -29,3 +29,29 @@ where
 {
     serializer.serialize_str(&id.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deserialize_id() {
+        assert_eq!(
+            deserialize_id(serde_json::Value::String("123".into())).unwrap(),
+            123
+        );
+        assert_eq!(
+            deserialize_id(serde_json::Value::Number(serde_json::Number::from(123))).unwrap(),
+            123
+        );
+        assert!(deserialize_id(serde_json::Value::Bool(true)).is_err());
+    }
+
+    #[test]
+    fn test_serialize_id() {
+        let mut buf = Vec::new();
+        let mut serializer = serde_json::Serializer::new(&mut buf);
+        serialize_id(&123, &mut serializer).unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), "\"123\"");
+    }
+}
