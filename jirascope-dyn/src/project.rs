@@ -34,13 +34,12 @@ pub fn prompt_select_project(env: &Env) -> Option<Project> {
 
 #[defun]
 fn create_interactive(env: &Env) -> Result<()> {
-    let mut jirascope = get_jirascope();
     let key = utils::force_prompt_string(env, "Enter project key: ")?;
     let name = utils::force_prompt_string(env, "Enter project name: ")?;
     let description = utils::force_prompt_string(env, "Enter project description: ")?;
     let url = utils::prompt_string(env, "Enter project info URL (or leave empty): ");
 
-    let users = jirascope
+    let users = get_jirascope()
         .get_users()?
         .into_iter()
         .filter(|u| u.active && u.account_type == "atlassian")
@@ -62,7 +61,7 @@ fn create_interactive(env: &Env) -> Result<()> {
 
     let lead_account_id = users[index.unwrap()].account_id.clone();
 
-    let project_categories = jirascope.get_project_categories()?;
+    let project_categories = get_jirascope().get_project_categories()?;
 
     let category_id = if project_categories.is_empty() {
         None
@@ -556,7 +555,7 @@ fn display_old_and_changed(env: &Env) -> Result<()> {
 }
 
 #[defun]
-fn delete_project_interactive(env: &Env) -> Result<Value<'_>> {
+fn delete_interactive(env: &Env) -> Result<Value<'_>> {
     let projects = get_jirascope().get_projects()?;
 
     let index = utils::prompt_select_index(

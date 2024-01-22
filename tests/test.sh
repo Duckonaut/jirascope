@@ -97,6 +97,9 @@ for test in $TESTS; do
     else
         printf "${ERROR_COLOR}FAIL${NC}\n"
         printf "Test exited with status $status\n"
+        printf "Expected exit code: $expected_exit_code\n"
+        printf "Output so far:\n"
+        echo "$output"
     fi
 done
 
