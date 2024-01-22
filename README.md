@@ -1,5 +1,6 @@
 # Jirascope
 [![MELPA](https://melpa.org/packages/jirascope-badge.svg)](https://melpa.org/#/jirascope)
+
 Emacs package for Jira Cloud integration.
 
 ## Usage
