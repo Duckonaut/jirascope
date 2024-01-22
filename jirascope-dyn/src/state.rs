@@ -1,4 +1,4 @@
-use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::sync::{OnceLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use emacs::{defun, Env};
 use jirascope_core::jira::{Issue, Project, ProjectDetailed};
@@ -9,7 +9,7 @@ use crate::{
     JIRASCOPE_BUFFER_NAME,
 };
 
-static STATE: OnceLock<Mutex<State>> = OnceLock::new();
+static STATE: OnceLock<RwLock<State>> = OnceLock::new();
 
 pub(crate) trait ConflictAware: Sized {
     type Key;
@@ -202,10 +202,18 @@ impl State {
     }
 }
 
-pub(crate) fn get_state<'a>() -> MutexGuard<'a, State> {
+pub(crate) fn get_state<'a>() -> RwLockReadGuard<'a, State> {
     let s = STATE
-        .get_or_init(|| Mutex::new(State::new()))
-        .lock()
+        .get_or_init(|| RwLock::new(State::new()))
+        .read()
+        .unwrap();
+    s
+}
+
+pub(crate) fn get_state_mut<'a>() -> RwLockWriteGuard<'a, State> {
+    let s = STATE
+        .get_or_init(|| RwLock::new(State::new()))
+        .write()
         .unwrap();
     s
 }
@@ -213,7 +221,7 @@ pub(crate) fn get_state<'a>() -> MutexGuard<'a, State> {
 pub(crate) fn setup(refresh_interval: f64) {
     let refresh_interval = std::time::Duration::from_secs_f64(refresh_interval);
     std::thread::spawn(move || loop {
-        let mut state = get_state();
+        let mut state = get_state_mut();
         match state.refresh() {
             Ok(_) => {
                 if state.dirty {
@@ -231,7 +239,7 @@ pub(crate) fn setup(refresh_interval: f64) {
 }
 
 pub(crate) fn refresh(env: &Env) -> Result<(), jirascope_core::Error> {
-    let mut state = get_state();
+    let mut state = get_state_mut();
     match state.refresh() {
         Ok(_) => {
             if state.dirty {

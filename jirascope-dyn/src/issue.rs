@@ -6,7 +6,7 @@ use jirascope_core::jira::{
 
 use crate::{
     concurrent::{self, workthread_spawn}, get_jirascope, project,
-    state::{self, get_state, ConflictCell},
+    state::{self, get_state, ConflictCell, get_state_mut},
     utils::{
         self, close_jirascope_diff_buffer, current_buffer_face_println, current_buffer_println,
         get_jirascope_buffer_content, open_jirascope_buffer, open_jirascope_diff_buffer,
@@ -81,7 +81,6 @@ fn prompt_issue_parent(env: &Env, project_key: &str) -> Option<i64> {
 
 #[defun]
 fn create_interactive(env: &Env) -> Result<Value<'_>> {
-    let mut jirascope = get_jirascope();
     let state = get_state();
 
     // let user choose project
@@ -92,7 +91,7 @@ fn create_interactive(env: &Env) -> Result<Value<'_>> {
     drop(state);
 
     // let user choose issue type
-    let create_meta = jirascope.get_issue_creation_meta()?;
+    let create_meta = get_jirascope().get_issue_creation_meta()?;
     let mut issue_types = create_meta
         .projects
         .into_iter()
@@ -187,10 +186,10 @@ fn edit_interactive(env: &Env) -> Result<Value<'_>> {
 
     let issue = issue.unwrap();
 
-    get_state().check_out_issue(issue.key.clone())?;
+    get_state_mut().check_out_issue(issue.key.clone())?;
     // in case something fails, we want to make sure the issue is returned
     // to not lock it forever
-    let guard = ScopeCleaner::new(|| get_state().return_issue());
+    let guard = ScopeCleaner::new(|| get_state_mut().return_issue());
 
     let mut issue_edit = IssueEdit::default();
 
@@ -210,7 +209,7 @@ fn edit_interactive(env: &Env) -> Result<Value<'_>> {
     .map(|d| AtlassianDoc::from_markdown(&d));
 
     workthread_spawn(move || {
-        if !get_state().try_return_issue(&*issue.key) {
+        if !get_state_mut().try_return_issue(&*issue.key) {
             concurrent::push_command(Box::new(move |env| {
                 env.message("Issue changed since last access. Please check the diff buffer.")?;
 
@@ -262,8 +261,8 @@ fn edit_graphical(env: &Env, issue_key: String) -> Result<()> {
 
     let issue = issue.unwrap();
 
-    get_state().return_issue();
-    get_state().check_out_issue(issue.key.clone())?;
+    get_state_mut().return_issue();
+    get_state_mut().check_out_issue(issue.key.clone())?;
 
     open_jirascope_buffer(env)?;
 
@@ -314,7 +313,7 @@ fn edit_graphical_finish(env: &Env) -> Result<Value<'_>> {
     };
 
     workthread_spawn(move || {
-        if !get_state().try_return_issue(&*key) {
+        if !get_state_mut().try_return_issue(&*key) {
             concurrent::push_command(Box::new(move |env| {
                 env.message("Issue changed since last access.")?;
 
@@ -323,11 +322,11 @@ fn edit_graphical_finish(env: &Env) -> Result<Value<'_>> {
                 if prompt_force_change(env, "Issue changed since last access")? {
                     let result = get_jirascope().edit_issue(&*key, issue_edit);
 
-                    state::get_state().return_issue();
+                    state::get_state_mut().return_issue();
 
                     signal_result(env, result, "Issue edited.", "Failed to edit issue.")?;
 
-                    state::get_state().check_out_issue(key.clone())?;
+                    state::get_state_mut().check_out_issue(key.clone())?;
                 }
 
                 close_jirascope_diff_buffer(env)?;
@@ -339,7 +338,7 @@ fn edit_graphical_finish(env: &Env) -> Result<Value<'_>> {
 
         let result = get_jirascope().edit_issue(&*key, issue_edit);
 
-        state::get_state().return_issue();
+        state::get_state_mut().return_issue();
 
         signal_result_async(result, "Issue edited.", "Failed to edit issue.");
 

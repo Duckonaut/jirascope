@@ -6,7 +6,7 @@ use jirascope_core::jira::{
 
 use crate::{
     concurrent::{self, workthread_spawn}, get_jirascope,
-    state::{self, get_state, ConflictCell},
+    state::{self, get_state, ConflictCell, get_state_mut},
     utils::{
         self, close_jirascope_diff_buffer, current_buffer_face_println, current_buffer_println,
         get_jirascope_buffer_content, open_jirascope_buffer, open_jirascope_diff_buffer,
@@ -314,8 +314,8 @@ fn edit_graphical(env: &Env, key: String) -> Result<()> {
 
     let project = project.unwrap();
 
-    get_state().return_project();
-    get_state().check_out_project(key.clone())?;
+    get_state_mut().return_project();
+    get_state_mut().check_out_project(key.clone())?;
 
     open_jirascope_buffer(env)?;
 
@@ -416,7 +416,7 @@ fn edit_graphical_finish(env: &Env) -> Result<()> {
     };
 
     workthread_spawn(move || {
-        if !get_state().try_return_project(og_key.as_str()) {
+        if !get_state_mut().try_return_project(og_key.as_str()) {
             concurrent::push_command(Box::new(move |env| {
                 env.message("Project changed since last access.")?;
 
@@ -425,11 +425,11 @@ fn edit_graphical_finish(env: &Env) -> Result<()> {
                 if prompt_force_change(env, "Project changed since last access")? {
                     let result = get_jirascope().edit_project(og_key.as_str(), project_edit);
 
-                    state::get_state().return_project();
+                    state::get_state_mut().return_project();
 
                     signal_result(env, result, "Project edited.", "Failed to edit project.")?;
 
-                    state::get_state().check_out_project(key.clone())?;
+                    state::get_state_mut().check_out_project(key.clone())?;
                 }
 
                 close_jirascope_diff_buffer(env)?;
@@ -441,7 +441,7 @@ fn edit_graphical_finish(env: &Env) -> Result<()> {
 
         let result = get_jirascope().edit_project(og_key.as_str(), project_edit);
 
-        state::get_state().return_project();
+        state::get_state_mut().return_project();
 
         signal_result_async(result, "Project edited.", "Failed to edit project.");
 

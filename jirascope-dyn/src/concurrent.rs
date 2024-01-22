@@ -21,6 +21,7 @@ impl CommandEntry {
 static mut COMMAND_QUEUE_RECEIVER: OnceLock<std::sync::mpsc::Receiver<CommandEntry>> =
     OnceLock::new();
 static mut COMMAND_QUEUE_SENDER: OnceLock<std::sync::mpsc::Sender<CommandEntry>> = OnceLock::new();
+static BATCH_MODE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub(crate) fn push_command(callback: Box<Command>) {
     let sender = unsafe { COMMAND_QUEUE_SENDER.get().cloned().unwrap() };
@@ -49,6 +50,11 @@ fn event_handler(env: &Env) -> emacs::Result<()> {
 
 #[defun]
 pub(crate) fn install_handler(env: &Env) -> emacs::Result<Value<'_>> {
+    let noninteractive = env.call("eval", [env.intern("noninteractive")?])?;
+    if noninteractive.is_not_nil() {
+        BATCH_MODE.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
     unsafe {
         let (sender, receiver) = std::sync::mpsc::channel();
         COMMAND_QUEUE_RECEIVER.set(receiver).unwrap();
@@ -72,16 +78,24 @@ pub fn workthread_panic_cleanup() {
 
 pub fn workthread_spawn<T: Send + 'static>(
     f: impl FnOnce() -> T + Send + 'static,
-) -> std::thread::JoinHandle<T> {
+) -> Option<std::thread::JoinHandle<T>> {
+
     WORKTHREAD_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-    std::thread::spawn(move || {
+    let handle = std::thread::spawn(move || {
         let result = f();
 
         WORKTHREAD_COUNTER.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
 
         result
-    })
+    });
+
+    if BATCH_MODE.load(std::sync::atomic::Ordering::SeqCst) {
+        handle.join().unwrap();
+        None
+    } else {
+        Some(handle)
+    }
 }
 
 pub fn workthread_count() -> usize {
