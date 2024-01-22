@@ -1,0 +1,3 @@
+[submodule "tests/with-simulated-input"]
+	path = tests/with-simulated-input
+	url = https://github.com/DarwinAwardWinner/with-simulated-input.git
